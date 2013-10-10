@@ -1,0 +1,75 @@
+GBStools tutorial
+2013-10-09
+Tom Cooke cooketho@gmail.com
+
+GBStools comes packaged with a toy data set (located in gbstools/test/):
+
+sim.fa is a 100 kb simulated chromosome.
+sim.digest.bed is a list of ApeKI restriction sites in sim.fa.
+{0..9}.bam are simulated 101-bp GBS reads mapped to these ApeKI sites.
+sim.vcf is a list of SNPs called from these alignments with GATK.
+sim.ped.vcf is a simulated set of GBS SNPs from a nuclear family.
+
+
+*Steps marked with '*' are already done for the toy data set.
+
+1) Add the scripts in /bin to your PYTHONPATH so python knows where
+   to look for them.
+
+*2) Make a BED file of restriction sites in the reference genome
+    (e.g. with the `emboss restrict` command).
+restrict -sequence sim.fa -enzymes ApeKI -outfile sim.digest -sitelen 2
+cat sim.digest | sed 's/TseI/ApeKI/' | python digest_to_bed.py > sim.digest.bed
+
+3) Convert restriction site BED file to GBS-BED format and index with tabix.
+cat sim.digest.bed | python make_gbstools_bed.py > sim.digest.gbsbed
+cat sim.digest.gbsbed | bgzip -c > sim.digest.gbsbed.gz
+tabix -p bed sim.digest.gbsbed.gz
+
+*4) Map your reads to the reference genome and call SNPs with your
+    favorite SNP-caller (e.g. GATK, samtools etc), resulting in a
+    vcf file of SNPs (sim.vcf in the toy data set).
+
+5) Annotat the aligned reads with restriction site information
+   and index the annotated bam files (e.g. with samtools).
+for i in {0..9};do
+python annotate_se_bam.py -i ${i}.bam -o ${i}.annotated.bam -r sim.digest.gbsbed.gz
+samtools index ${i}.annotated.bam
+done
+
+6) Summarize the mapping of reads to restriction sites.
+for i in {0..9};do
+python mapping_summary.py -i ${i}.annotated.bam > ${i}.rs_mapping_summary
+done
+
+6) Make a list of samples and bam files, and a list of summaries.
+for i in {0..9};do
+echo -e "${i}\t${i}.annotated.bam" >> bamlist.txt
+echo -e "${i}\t${i}.rs_mapping_summary.txt" >> summaries.txt
+done
+
+7) Calculate the depth-of-coverage normalization factors.
+python normfactors.py --summaries summaries.txt > normfactors.txt
+
+8) Perform GBStools likelihood ratio test on your SNPs to test
+   for restriction site variants (normalization factors default
+   (to 1.0 when a normfactors file is not provided).
+python likelhood_ratio.py -i sim.vcf -o sim.lrt.vcf -b bamlist.txt
+
+
+And that's that! 
+
+To run GBStools in pedigree mode for nuclear
+families, supply a PLINK-formatted PED file for two parents and
+their offspring with the --ped option in likelihod_ratio.py. 
+
+To change the default index of dispersion for read coverage 
+used in the GBStools model, use the -d option. As -d approaches
+1.0 (Poisson) the model becomes more sensitive, but specificity
+may suffer. You may want to try out several different values
+to find what works best with your data.
+
+To run the model in DP-only mode (i.e. without considering
+base likelihoods) use the --dpmode switch.
+
+
