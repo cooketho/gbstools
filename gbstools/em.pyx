@@ -1,9 +1,8 @@
-#cdef extern from "math.h":
-#    double log (double x)
-#    double exp (double x)
+cdef extern from "math.h":
+    double log (double x)
+    double exp (double x)
 
 from scipy.misc import comb
-import math
 from collections import namedtuple
 
 # Defined as ('A' count, 'a', count, '-' count) (see GBStools notes).
@@ -61,7 +60,7 @@ def trio_genotypes(genotypes, loglik=True):
     if loglik:
         for gt in prob:
             for offspring_gt in prob[gt]:
-                prob[gt][offspring_gt] = math.log(prob[gt][offspring_gt])
+                prob[gt][offspring_gt] = log(prob[gt][offspring_gt])
     return(prob)
 
 # Get all possible parent/offspring combinations and their probabilities.
@@ -99,11 +98,9 @@ def update(param, calls, disp):
                 sample_lik[(z, g, psi)] = D_lik + d_lik + g_lik + z_lik
         # Normalize the likelihoods by likmax to avoid underflow.
         likmax = max(sample_lik.values())
-#        liksum = sum([exp(l - likmax) for l in sample_lik.values()])
-        liksum = sum([math.e**(l - likmax) for l in sample_lik.values()])
+        liksum = sum([exp(l - likmax) for l in sample_lik.values()])
         for z, g, psi in sample_lik:
-#            lik = exp(sample_lik[(z, g, psi)] - likmax)
-            lik = math.e**(sample_lik[(z, g, psi)] - likmax)
+            lik = exp(sample_lik[(z, g, psi)] - likmax)
             # Update the counter variables.
             phi[0] += g[0] * lik / (2 * n * liksum)
             phi[1] += g[1] * lik / (2 * n * liksum)
@@ -114,8 +111,7 @@ def update(param, calls, disp):
             lamb_denom += (lambda_denom(g, z, call.DP, call.NF, param['lambda'], psi) *
                            lik / liksum)
         try:
-#            loglik += log(sum([exp(l) for l in sample_lik.values()]))
-            loglik += math.log(sum([math.e**(l) for l in sample_lik.values()]))
+            loglik += log(sum([exp(l) for l in sample_lik.values()]))
         except:
             loglik = None
     lamb = param['lambda'] - lamb_numer / lamb_denom
@@ -129,6 +125,7 @@ def update(param, calls, disp):
 
 
 def ped_update(param, calls, disp, parental_gt):
+    '''Update parameters by EM for nuclear family.'''
     # Get hash of F1 GT prob, keyed by GT.
     offspring_gt = trio_gt[parental_gt]
     n = len(calls)
@@ -140,11 +137,9 @@ def ped_update(param, calls, disp, parental_gt):
         sample_lik = {}
         for z in (0, 1):
             if call.is_mother:
-#                genotypes = {parental_gt.mother:log(1)}
-                genotypes = {parental_gt.mother:math.log(1)}
+                genotypes = {parental_gt.mother:log(1)}
             elif call.is_father:
-#                genotypes = {parental_gt.father:log(1)}
-                genotypes = {parental_gt.father:math.log(1)}
+                genotypes = {parental_gt.father:log(1)}
             elif call.is_child:
                 genotypes = offspring_gt
             else:
@@ -160,23 +155,20 @@ def ped_update(param, calls, disp, parental_gt):
                 sample_lik[(z, g, psi)] = D_lik + d_lik + g_lik + z_lik
         # Normalize the likelihoods by likmax to avoid underflow.
         likmax = max(sample_lik.values())
-#        liksum = sum([exp(l - likmax) for l in sample_lik.values()])
         if likmax == -float('Inf'):
             likmax = 0
             liksum = 1
         else:
-            liksum = sum([math.e**(l - likmax) for l in sample_lik.values()])
+            liksum = sum([exp(l - likmax) for l in sample_lik.values()])
         for z, g, psi in sample_lik:
-#            lik = exp(sample_lik[(z, g, psi)] - likmax)
-            lik = math.e**(sample_lik[(z, g, psi)] - likmax)
+            lik = exp(sample_lik[(z, g, psi)] - likmax)
             delta += (1 - z) * lik / (n * liksum)
             lamb_numer += (lambda_numer(g, z, call.DP, call.NF, param['lambda'], psi) *
                            lik / liksum)
             lamb_denom += (lambda_denom(g, z, call.DP, call.NF, param['lambda'], psi) *
                            lik / liksum)
         try:
-#            loglik += log(sum([exp(l) for l in sample_lik.values()]))
-            loglik += math.log(sum([math.e**(l) for l in sample_lik.values()]))
+            loglik += log(sum([exp(l) for l in sample_lik.values()]))
         except:
             loglik = -float('Inf')
     try:
@@ -191,8 +183,7 @@ def ped_update(param, calls, disp, parental_gt):
     return(param_update)     
 
 
-#cdef dreads(g, pl, loglik=True):
-def dreads(g, pl, loglik=True):
+cdef dreads(g, pl, loglik=True):
     # Function to calculate likelihood of observing reads given an apparent genotype.
     if g[2] == 0:
         g_apparent = g[1]
@@ -211,14 +202,12 @@ def dreads(g, pl, loglik=True):
         return(p)
     else:
         if p > 0:
-#            return(log(p))
-            return(math.log(p))
+            return(log(p))
         else:
             return(-float('Inf'))
 
-#cdef dnbinom(x, mu, psi, loglik=True):
-def dnbinom(x, mu, psi, loglik=True):
-    # Function to calculate negative binomial probability.
+cdef dnbinom(x, mu, psi, loglik=True):
+    '''Function to calculate negative binomial probability.'''
     psi = int(psi)    # Round to nearest integer to speed up comb().
     if psi <= 0:    # psi must be > 0.
         psi = 1
@@ -237,41 +226,35 @@ def dnbinom(x, mu, psi, loglik=True):
         return(p)
     else:
         if p > 0:
-#            return(log(p))
-            return(math.log(p))
+            return(log(p))
         else:
             return(-float('Inf'))
 
 
-#cdef dmultinom(x, prob, loglik=True):
-def dmultinom(x, prob, loglik=True):
-    # Function to calculate multinomial probability.
+cdef dmultinom(x, prob, loglik=True):
+    '''Function to calculate multinomial probability.'''
     p = 2**(1 in x) * prob[0]**x[0] * prob[1]**x[1] * prob[2]**x[2]
     if not loglik:
         return(p)
     else:
         if p > 0:
-#            return(log(p))
-            return(math.log(p))
+            return(log(p))
         else:
             return(-float('Inf'))
 
-#cdef dbernoulli(x, prob, loglik=True):
-def dbernoulli(x, prob, loglik=True):
-    # Function to calculate bernoulli probability.
+cdef dbernoulli(x, prob, loglik=True):
+    '''Function to calculate bernoulli probability.'''
     p = (1 - prob)**x * prob**(1 - x)
     if not loglik:
         return(p)
     else:
         if p > 0:
-#            return(log(p))
-            return(math.log(p))            
+            return(log(p))
         else:
             return(-float('Inf'))
 
-#cdef lambda_numer(g, z, d, r, lamb, psi):
-def lambda_numer(g, z, d, r, lamb, psi):
-    # Function to calculate numerator in EM lambda update (see GBStools notes).
+cdef lambda_numer(g, z, d, r, lamb, psi):
+    '''Function to calculate numerator in EM lambda update (see GBStools notes).'''
     m = 2.0 - g[2]
     if m * z == 0:
         try:
@@ -288,7 +271,7 @@ def lambda_numer(g, z, d, r, lamb, psi):
 
 #cdef lambda_denom(g, z, d, r, lamb, psi):
 def lambda_denom(g, z, d, r, lamb, psi):
-    # Function to calculate denominator in EM lambda update (see GBStools notes).
+    '''Function to calculate denominator in EM lambda update (see GBStools notes).'''
     m = 2.0 - g[2]
     if m * z == 0:
         try:
