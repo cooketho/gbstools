@@ -20,17 +20,23 @@ parser.add_option('--sort_by_cutsite', dest='sort', action="store_true", help='s
 (opt, args) = parser.parse_args()
 
 # Subtract these values from the restriction site start to get the expected ligation sites.
+# Keyed by read.is_reverse, recognition site strand, recognition site enzyme.
+# Note that only non-palindromic sites have an entry for the '-' strand.
 LIG_SITE = {True:{'+':{'BpuEI':[-20,-19],
                        'BsaXI':[-19,-18,13,14],
                        'CspCI':[-23,-22,13,14],
-                       'ApeKI':[-3]},
+                       'ApeKI':[-3],
+                       'PstI':[-4],
+                       'MspI':[-2]},
                   '-':{'BpuEI':[16,17],
                        'BsaXI':[-21,-20,11,12],
                        'CspCI':[-23,-22,13,14]}},
             False:{'+':{'BpuEI':[-22,-21],
                         'BsaXI':[-21,-22,9,10],
                         'CspCI':[-25,-24,10,11],
-                        'ApeKI':[-1]},
+                        'ApeKI':[-1],
+                        'PstI':[-1],
+                        'MspI':[-1]},
                    '-':{'BpuEI':[13,14],
                         'BsaXI':[-24,-23,7,8],
                         'CspCI':[-25,-24,10,11]}}}

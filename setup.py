@@ -2,12 +2,6 @@ from setuptools import setup
 from distutils.core import setup
 from distutils.extension import Extension
 
-try:
-    from Cython.Distutils import build_ext
-    CYTHON = True
-except ImportError:
-    CYTHON = False
-
 requires = []
 
 try:
@@ -15,6 +9,32 @@ try:
     collections.OrderedDict
 except AttributeError:
     requires.append('ordereddict')
+
+try:
+    import vcf
+except ImportError:
+    requires.append('PyVCF')
+
+try:
+    import pysam
+except ImportError:
+    requires.append('pysam')
+
+try:
+    import numpy
+except ImportError:
+    requires.append('numpy')
+
+try:
+    import scipy
+except ImportError:
+    requires.append('scipy')
+
+try:
+    from Cython.Distutils import build_ext
+    CYTHON = True
+except ImportError:
+    CYTHON = False
 
 cmdclass = {}
 ext_modules = []
@@ -36,10 +56,5 @@ setup(
     license='LICENSE.txt',
     description='Bioinformatics tools for GBS',
     long_description=open('README.txt').read(),
-    install_requires=[
-        "PyVCF >= 0.6.3",
-        "pysam >= 0.7.5",
-        "numpy >= 1.3.0",
-        "scipy >= 0.7.0",
-    ],
+    requires=requires,
 )
