@@ -39,10 +39,23 @@ cmdclass = {}
 ext_modules = []
 
 if CYTHON:
-    ext_modules += [Extension("em", ["gbstools/em.pyx"])]
+    ext_modules += [Extension('em', ['gbstools/em.pyx'])]
     cmdclass.update({'build_ext':build_ext})
 else:
-    ext_modules += [Extension("em", ["gbstools/em.c"])]
+    ext_modules += [Extension('em', ['gbstools/em.c'])]
+
+scripts = ['bin/annotate_pe_bam.py',
+           'bin/annotate_se_bam.py',
+           'bin/digest_to_bed.py',
+           'bin/likelihood_ratio.py',
+           'bin/make_gbstools_bed.py',
+           'bin/mapping_summary.py',
+           'bin/normfactors.py',
+           'bin/simulate_dp.py',
+           'bin/simulate_fasta.py',
+           'bin/simulate_fastq.py',
+           'bin/simulate_gbs_vcf.py',
+           'bin/simulate_ped_vcf.py']
 
 setup(
     name='GBStools',
@@ -50,10 +63,11 @@ setup(
     author='Tom Cooke',
     author_email='cooketho@gmail.com',
     packages=['gbstools'],
+    scripts=scripts,
     cmdclass=cmdclass,
     ext_modules=ext_modules,
     license='LICENSE.txt',
     description='Bioinformatics tools for GBS',
-    long_description=open('README.txt', 'r').read(),
+    long_description=open('README.txt').read(),
     requires=requires,
 )

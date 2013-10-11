@@ -1,13 +1,13 @@
-# pyms.py
-# Tom Cooke
-# 2013-08-06
-# Classes and functions for parsing output from Hudson's MS and calculating
-# the frequencies of 'A', 'a', and '-' alleles as described in the GBStools notes.
+"""
+A utility for parsing output from Hudson's MS and using it to simulate
+a GBS SNP data, including the frequencies of 'A', 'a', and '-' alleles 
+as described in the docs/gbstools_notes.pdf.
+"""
 
 import random
 
 class Reader():
-    # Parser class for MS output files. Generates objects of Sample class.
+    """Parser class for MS output files. Generates ``Sample`` objects."""
     def __init__(self, msfile, N=500, L=6, readlen=101, variantsonly=False):
         self.msfile = msfile
         self.header = self.parse_header()
@@ -22,7 +22,7 @@ class Reader():
         self.rand = random.Random(0)
     
     def parse_header(self):
-        # Parse the header line of the MS output file.
+        '''Parse the header line of the MS output file.'''
         header = []
         for line in self.msfile:
             line = line.strip()
@@ -36,7 +36,7 @@ class Reader():
         return(self)
     
     def next(self):
-        # Generate a "Sample" object that contains information from one MS site.
+        '''Generate a "Sample" object that contains information from one MS site.'''
         segsites = None
         positions = []
         haplotypes = []
@@ -62,7 +62,7 @@ class Reader():
         raise StopIteration
 
 class Sample():
-    # Class for storing and manipulating data from one MS coalescent sample.
+    """Class for storing and manipulating data from one MS coalescent sample."""
     def __init__(self, segsites, positions, haplotypes, N, L, readlen, variantsonly, rand):
         self.segsites = segsites
         self.positions = positions
@@ -76,7 +76,7 @@ class Sample():
         self.dcount, self.missing, self.ac, self.ac_sampled, self.background, self.genotypes = self.counts()
         
     def get_minus_haplotype(self):
-        # Get list of SNP alleles that cause the '-' haplotype (0, 1, or None).
+        '''Get list of SNP alleles that cause the '-' haplotype (0, 1, or None).'''
         minus_haplotype = []
         if self.variantsonly:    # Should each locus with segregating sites have an rs variant?
             if self.positions:
@@ -99,6 +99,7 @@ class Sample():
         return(minus_haplotype)
 
     def counts(self):
+        '''Calculate DCount, Missing, AC, ACgbs, `-` background, GT list.'''
         n = len(self.haplotypes)
         if self.segsites:    # Ignore sites where no SNP is segregating.
             # Indices of alleles in the haplotype that are in the 2 x 101 bp region.

@@ -1,0 +1,10 @@
+0	0.rs_mapping_summary
+1	1.rs_mapping_summary
+2	2.rs_mapping_summary
+3	3.rs_mapping_summary
+4	4.rs_mapping_summary
+5	5.rs_mapping_summary
+6	6.rs_mapping_summary
+7	7.rs_mapping_summary
+8	8.rs_mapping_summary
+9	9.rs_mapping_summary

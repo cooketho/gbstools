@@ -1,2 +1,3 @@
 include *.txt
-recursive-include docs *.txt
+recursive-include docs *.txt *.pdf *.tex
+recursive-include gbstools/test *.bam *.fa *bed *.txt *.ped *.vcf *.rs_mapping_summary

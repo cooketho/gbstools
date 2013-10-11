@@ -1,0 +1,10 @@
+0	0.annotated.bam
+1	1.annotated.bam
+2	2.annotated.bam
+3	3.annotated.bam
+4	4.annotated.bam
+5	5.annotated.bam
+6	6.annotated.bam
+7	7.annotated.bam
+8	8.annotated.bam
+9	9.annotated.bam

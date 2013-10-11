@@ -1,0 +1,28 @@
+# file: 3.annotated.bam
+#
+# mapped_in_pair	mapped_in_pair_to_restriction_site	reads
+# 0	0	0
+# 0	1	0
+# 0	2	0
+# 1	0	0
+# 1	1	800
+# 1	2	0
+# 2	0	0
+# 2	1	0
+# 2	2	0
+#
+# enzyme	reads
+# ApeKI	800
+#
+insert_size	reads
+202	66
+206	7
+216	81
+225	84
+260	79
+272	68
+276	76
+344	77
+349	101
+358	85
+416	76
