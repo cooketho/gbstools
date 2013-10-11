@@ -1,4 +1,3 @@
-from setuptools import setup
 from distutils.core import setup
 from distutils.extension import Extension
 
@@ -55,6 +54,6 @@ setup(
     ext_modules=ext_modules,
     license='LICENSE.txt',
     description='Bioinformatics tools for GBS',
-    long_description=open('README.txt').read(),
+    long_description=open('README.txt', 'r').read(),
     requires=requires,
 )

@@ -15,8 +15,8 @@ score_snps.py -i <input vcf file>
 
 parser = OptionParser(USAGE)
 parser.add_option('-i', '--input', dest='i', help='input bam file')
-parser.add_option('-o', '--output', dest='o', default=sys.stdout, help='output bam file')
-parser.add_option('-d', '--dispersion', dest='disp', default=2.5, help='output bam file')
+parser.add_option('-o', '--output', dest='o', default=None, help='output bam file')
+parser.add_option('-d', '--dispersion', dest='disp', default=2.5, type='float', help='output bam file')
 parser.add_option('-b', '--bam', dest='bamlist', default=None, help='list of sample/bam file pairs')
 parser.add_option('-n', '--normfactors', dest='nf', default=None, help='normalization factors file')
 parser.add_option('-s', '--samples', dest='samples', default=None, help='samples to include')
@@ -24,24 +24,29 @@ parser.add_option('--dpmode',dest='dpmode', action="store_true", help='use DP da
 parser.add_option('--ped',dest='ped', default=None, help='PED file for nuclear family')
 (opt, args) = parser.parse_args()
 
+if opt.o:
+   outstream = open(opt.o, 'w')
+else:
+   outstream = sys.stdout
+
 reader = gbstools.Reader(filename=opt.i, bamlist=opt.bamlist, norm=opt.nf, 
                          disp=opt.disp, ped=opt.ped, samples=opt.samples,
                          dpmode=opt.dpmode)
-writer = gbstools.Writer(open(opt.o, 'w'), template=reader)
+writer = gbstools.Writer(outstream, template=reader)
 
 for snp in reader:
    if not reader.family:
-      while not snp.param[-1]['converged'] and not snp.param[-1]['fail']:
-         snp.update_param(param=snp.param)
-         if len(snp.param) > 40:
-            snp.param[-1]['fail'] = True
-      while not snp.null_param[-1]['converged'] and not snp.null_param[-1]['fail']:
-         snp.update_param(snp.null_param)
-         if len(snp.null_param) > 40:
-            snp.null_param[-1]['fail'] = True
+      while not snp.check_convergence(snp.param['H1']):
+         snp.update_param(snp.param['H1'])
+         if len(snp.param['H1']) > 40:
+            snp.param['H1'][-1]['fail'] = True
+      while not snp.check_convergence(snp.param['H0']):
+         snp.update_param(snp.param['H0'])
+         if len(snp.param['H0']) > 40:
+            snp.param['H0'][-1]['fail'] = True
    else:
       for gt in snp.param:
-         while not snp.param[gt][-1]['converged'] and not snp.param[gt][-1]['fail']:
+         while not snp.check_convergence(snp.param[gt]):
             snp.update_param(param=snp.param[gt], parental_gt=gt)
             if len(snp.param[gt]) > 40:
                snp.param[gt][-1]['fail'] = True

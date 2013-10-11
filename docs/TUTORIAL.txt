@@ -4,17 +4,19 @@ Tom Cooke cooketho@gmail.com
 
 GBStools comes packaged with a toy data set (located in gbstools/test/):
 
-sim.fa is a 100 kb simulated chromosome.
-sim.digest.bed is a list of ApeKI restriction sites in sim.fa.
-{0..9}.bam are simulated 101-bp GBS reads mapped to these ApeKI sites.
-sim.vcf is a list of SNPs called from these alignments with GATK.
-sim.ped.vcf is a simulated set of GBS SNPs from a nuclear family.
-
+sim.fa                    100 kb simulated chromosome.
+sim.digest.bed            List of ApeKI restriction sites in sim.fa.
+{0..9}.bam                101-bp GBS reads mapped to these ApeKI sites.
+sim.vcf                   SNPs called from these alignments with GATK.
+sim.ped.vcf               SNPs from a nuclear family.
 
 *Steps marked with '*' are already done for the toy data set.
 
 1) Add the scripts in /bin to your PYTHONPATH so python knows where
-   to look for them.
+   to look for them. Install tabix and bgzip if you don't have them:
+   https://sourceforge.net/projects/samtools/files/tabix/
+   Install a program for doing in-silico digests, e.g. emboss restrict:
+   http://emboss.sourceforge.net/download/
 
 *2) Make a BED file of restriction sites in the reference genome
     (e.g. with the `emboss restrict` command).
@@ -22,6 +24,7 @@ restrict -sequence sim.fa -enzymes ApeKI -outfile sim.digest -sitelen 2
 cat sim.digest | sed 's/TseI/ApeKI/' | python digest_to_bed.py > sim.digest.bed
 
 3) Convert restriction site BED file to GBS-BED format and index with tabix.
+   (see footnote **)
 cat sim.digest.bed | python make_gbstools_bed.py > sim.digest.gbsbed
 cat sim.digest.gbsbed | bgzip -c > sim.digest.gbsbed.gz
 tabix -p bed sim.digest.gbsbed.gz
@@ -30,9 +33,10 @@ tabix -p bed sim.digest.gbsbed.gz
     favorite SNP-caller (e.g. GATK, samtools etc), resulting in a
     vcf file of SNPs (sim.vcf in the toy data set).
 
-5) Annotat the aligned reads with restriction site information
+5) Annotate the aligned reads with restriction site information
    and index the annotated bam files (e.g. with samtools).
 for i in {0..9};do
+samtools index ${i}.bam
 python annotate_se_bam.py -i ${i}.bam -o ${i}.annotated.bam -r sim.digest.gbsbed.gz
 samtools index ${i}.annotated.bam
 done
@@ -45,7 +49,7 @@ done
 6) Make a list of samples and bam files, and a list of summaries.
 for i in {0..9};do
 echo -e "${i}\t${i}.annotated.bam" >> bamlist.txt
-echo -e "${i}\t${i}.rs_mapping_summary.txt" >> summaries.txt
+echo -e "${i}\t${i}.rs_mapping_summary" >> summaries.txt
 done
 
 7) Calculate the depth-of-coverage normalization factors.
@@ -59,9 +63,9 @@ python likelhood_ratio.py -i sim.vcf -o sim.lrt.vcf -b bamlist.txt
 
 And that's that! 
 
-To run GBStools in pedigree mode for nuclear
-families, supply a PLINK-formatted PED file for two parents and
-their offspring with the --ped option in likelihod_ratio.py. 
+To run GBStools in pedigree mode for nuclear families, supply 
+a PLINK-formatted PED file for two parents and their offspring 
+with the --ped option in likelihod_ratio.py. 
 
 To change the default index of dispersion for read coverage 
 used in the GBStools model, use the -d option. As -d approaches
@@ -73,3 +77,25 @@ To run the model in DP-only mode (i.e. without considering
 base likelihoods) use the --dpmode switch.
 
 
+
+** The following enzymes are supported by defualt in make_gbstools_bed.py:
+Elshire et al (2011) ApeKI
+Poland et al (2012) PstI + MspI
+Cooke et al (in preparation) BpuEI + BsaXI + CspCI
+Baird et al (2008) EcoRI + SbfI
+Petersen et al (2012) EcoRI + MspI
+
+If you don't see your enzyme in the list, or you want to manually specify
+the distance from the recognition site where fwd and rev reads will map,
+you can make an offsets file with format:
+
+    enzyme_name    strand    read_is_reverse    offset
+    ApeKI	   +	     True		3
+    ApeKI	   +	     False		1
+    .		   .	     .			.
+    .		   .	     .			.
+
+where ``read_is_reverse`` is True (1) for reverse reads and False (0)
+for forward reads. Then use:
+
+cat sim.digest.bed | python make_gbstools_bed.py --ligation_offsets <myoffsets> > sim.digest.gbsbed

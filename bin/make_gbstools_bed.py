@@ -10,36 +10,59 @@ by annotate_reads.py and other GBStools scripts.
 USAGE = """
 make_gbstools_bed.py -i <input bed file>
                      -o <output GBSbed file> (default=stdout)
-                     --sort_by_cutsite <bool> (default=False)
+                     --ligation_offsets <ligation site offsets file> (default=None)
+                     --lig_sort (Sort fwd and rev read ligation sites separately. Default is to sort by recognition site).
 """
 
 parser = OptionParser(USAGE)
 parser.add_option('-i', '--input', dest='i', default=sys.stdin, help='input bed file')
 parser.add_option('-o', '--output', dest='o', default=sys.stdout, help='output GBSbed file')
-parser.add_option('--sort_by_cutsite', dest='sort', action="store_true", help='sort by cut site?')
+parser.add_option('--ligation_offsets', dest='offsets', default=None, help='file of ligation site offsets from recognition sites')
+parser.add_option('--ligation_sort', dest='ligsort', action="store_true", help='sort fwd and rev ligation sites separately')
 (opt, args) = parser.parse_args()
 
-# Subtract these values from the restriction site start to get the expected ligation sites.
-# Keyed by read.is_reverse, recognition site strand, recognition site enzyme.
-# Note that only non-palindromic sites have an entry for the '-' strand.
-LIG_SITE = {True:{'+':{'BpuEI':[-20,-19],
-                       'BsaXI':[-19,-18,13,14],
-                       'CspCI':[-23,-22,13,14],
-                       'ApeKI':[-3],
-                       'PstI':[-4],
-                       'MspI':[-2]},
-                  '-':{'BpuEI':[16,17],
-                       'BsaXI':[-21,-20,11,12],
-                       'CspCI':[-23,-22,13,14]}},
-            False:{'+':{'BpuEI':[-22,-21],
-                        'BsaXI':[-21,-22,9,10],
-                        'CspCI':[-25,-24,10,11],
-                        'ApeKI':[-1],
-                        'PstI':[-1],
-                        'MspI':[-1]},
-                   '-':{'BpuEI':[13,14],
-                        'BsaXI':[-24,-23,7,8],
-                        'CspCI':[-25,-24,10,11]}}}
+# Add these values from the restriction site start to get the expected ligation sites.
+# Keyed by (enyzme, strand, read_is_reverse)
+DEFAULT_OFFSETS = {('BpuEI', '+', True): [19, 20],
+                   ('BpuEI', '+', False): [21, 22],
+                   ('BpuEI', '-', True): [-17, -16],
+                   ('BpuEI', '-', False): [-14, -13],
+                   ('BsaXI', '+', True): [-14, -13, 18, 19],
+                   ('BsaXI', '+', False): [-10, -9, 21, 22],
+                   ('BsaXI', '-', True): [-12, -11, 20, 21],
+                   ('BsaXI', '-', False): [-8, -7, 23, 24],
+                   ('CspCI', '+', True): [-14, -13, 22, 23],
+                   ('CspCI', '+', False): [-11, -10, 24, 25],
+                   ('CspCI', '-', True): [-14, -13, 22, 23],
+                   ('CspCI', '-', False): [-11, -10, 24, 25],
+                   ('ApeKI', '+', True): [3],
+                   ('ApeKI', '+', False): [1],
+                   ('PstI', '+', True): [4],
+                   ('PstI', '+', False): [1],
+                   ('MspI', '+', True): [2],
+                   ('MspI', '+', False): [1],
+                   ('EcoRI', '+', True): [4],
+                   ('EcoRI', '+', False): [1],
+                   ('SbfI', '+', True): [5],
+                   ('SbfI', '+', False): [2]}
+
+offsets = {}
+# Get offsets from the user if they are provided.
+try:
+    offsets = open(opt.offsets, 'r')
+    for line in offsets:
+        line = line.strip()
+        enzyme, strand, read_is_rev, offset = line.split()
+        offset = int(offset)
+        try:
+            offsets[(enzyme, strand, read_is_rev)].append(offset)
+        except:
+            offsets[(enzyme, strand, read_is_rev)] = [offset]
+except:
+    if opt.offsets:
+        print "Couldn't parse %s. Using default offsets." % opt.offsets
+    offsets = DEFAULT_OFFSETS
+
 
 RecSite = namedtuple('RecSite', 'enzyme start end strand')
 chrom = None
@@ -56,7 +79,7 @@ class Chromosome():
 
     def merge_sites(self):
         # Sort by the max of the rev ligation sites or the min of the forward sites.
-        if opt.sort:
+        if opt.ligsort:
             sites_sorted = sorted(self.sites, key=lambda i: i['frag_end'])
         else:
             sites_sorted = self.sites
@@ -117,9 +140,9 @@ for line in input:
         chrom.merge_sites()
         chrom.write()
         chrom = Chromosome(chrom_name)    # Create a new Chromosome object.
-    # Subtract 1 from the start site to convert to 0-indexed start site.
-    fwd_lig = [start - i for i in LIG_SITE[False][strand][enzyme]]
-    rev_lig = [start - i for i in LIG_SITE[True][strand][enzyme]]
+    # Make lists of expected mapping (ligation) sites for reads.
+    fwd_lig = [start + i for i in offsets[(enzyme, strand, False)]]
+    rev_lig = [start + i for i in offsets[(enzyme, strand, True)]]
     # Append the site to the Chromosome object (fwd and rev).
     chrom.sites.append({'RecSite':RecSite(enzyme, start, end, strand),
                         'rev_lig':rev_lig, 'frag_end':min(rev_lig), 'rev_len':'.'})

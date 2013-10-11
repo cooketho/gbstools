@@ -13,8 +13,8 @@ GENO = ((2,0,0),
         (0,1,1),
         (0,0,2))
 # For running EM without PL data.
-GENO_DPMODE = ((0,0,0),
-               (0,0,1),
+GENO_DPMODE = ((2,0,0),
+               (1,0,1),
                (0,0,2))
 
 # Make a hash of combinations to avoid redundant calculation.
@@ -69,10 +69,11 @@ trio_gt = trio_genotypes(GENO)
 def update(param, calls, disp):
     '''Update parameters by EM.'''
     n = len(calls)    # Number of samples.
-    dp_mode = False
-    genotypes = GENO
     # If there is no PL data, use DP-mode.
-    if not [call.PL for call in calls if call.PL]:
+    if [call.PL for call in calls if call.PL]:
+        dp_mode = False
+        genotypes = GENO
+    else:
         dp_mode = True
         genotypes = GENO_DPMODE
     # Initialize counter variables for phi, delta, lambda, loglik.
@@ -88,10 +89,10 @@ def update(param, calls, disp):
                 m = (2.0 - g[2])    # Apparent ploidy, given g.
                 mu = param['lambda'] * call.NF * z * m / 2    # Expected coverage.
                 psi = mu / (disp - 1)    # Size parameter for nbinom.
-                if not dp_mode:
-                    D_lik = dreads(g, call.PL)    # Read data likelihood.
-                else:
+                if dp_mode:
                     D_lik = 0
+                else:
+                    D_lik = dreads(g, call.PL)    # Read data likelihood.
                 d_lik = dnbinom(call.DP, mu, psi)    # Coverage likelihood.
                 g_lik = dmultinom(g, param['phi'])    # Genotype likelihood.
                 z_lik = dbernoulli(z, param['delta'])    # Digest fail likelihood.
@@ -118,7 +119,6 @@ def update(param, calls, disp):
     param_update = {'phi':phi, 
                     'delta':delta, 
                     'lambda':lamb, 
-                    'converged':param['converged'], 
                     'fail':param['fail'], 
                     'loglik':loglik}
     return(param_update)            
@@ -177,7 +177,6 @@ def ped_update(param, calls, disp, parental_gt):
         lamb = param['lambda']
     param_update = {'delta':delta, 
                     'lambda':lamb, 
-                    'converged':param['converged'], 
                     'fail':param['fail'], 
                     'loglik':loglik}
     return(param_update)     

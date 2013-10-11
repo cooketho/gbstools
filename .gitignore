@@ -1,2 +1,14 @@
 *.pyc
 *~
+*.bai
+*.annotated.bam
+*.rs_mapping_summary
+gbstools/test/summaries.txt
+gbstools/test/bamlist.txt
+gbstools/test/normfactors.txt
+*.gbsbed
+*.tbi
+*.gz
+*.egg-info
+build
+dist

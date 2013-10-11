@@ -1,11 +1,11 @@
-import collections
-import math
+import em
 import vcf
 import pysam
 from numpy import median
+import math
 from vcf.model import make_calldata_tuple
-import em
 from collections import namedtuple
+import warnings
 
 try:
     from collections import Counter
@@ -25,7 +25,7 @@ CONFUSION_MATRIX = {'A':{'A':None, 'C':0.577, 'G':0.171, 'T':0.252},
                     'T':{'A':0.458, 'C':0.221, 'G':0.320, 'T':None}}
 
 """INFO fields to be added to the vcf header by GBStools."""
-_Info = collections.namedtuple('Info', ['id', 'num', 'type', 'desc'])
+_Info = namedtuple('Info', ['id', 'num', 'type', 'desc'])
 INFO = (_Info('DLR', None, 'Float', 'Dropout likelihood ratio (GBStools)'),
         _Info('DFreq', None, 'Float', 'Dropout allele frequency estimated by EM (GBStools)'),
         _Info('AFH1', None, 'Float', 'Allele frequency estimated by EM (GBStools)'),
@@ -43,6 +43,7 @@ INFO = (_Info('DLR', None, 'Float', 'Dropout likelihood ratio (GBStools)'),
         _Info('InsMed', None, 'Float', 'Insert size median'),
         _Info('InsMAD', None, 'Float', 'Insert size MAD'))
 
+"""INFO fields to be added to vcf header when --ped option is used."""
 PEDINFO = (_Info('DLR', None, 'Float', 'Dropout likelihood ratio (GBStools)'),
            _Info('ParentsH1', None, 'String', 'Maximum-likelihood parental genotypes for alt hypothesis'),
            _Info('ParentsH0', None, 'String', 'Maximum-likelihood parental genotypes for null hypothesis'),
@@ -60,7 +61,7 @@ PEDINFO = (_Info('DLR', None, 'Float', 'Dropout likelihood ratio (GBStools)'),
            _Info('InsMAD', None, 'Float', 'Insert size MAD'))
 
 """FORMAT fields to be added to the vcf header by GBStools."""
-_Format = collections.namedtuple('Format', ['id', 'num', 'type', 'desc'])
+_Format = namedtuple('Format', ['id', 'num', 'type', 'desc'])
 FORMAT = (_Format('DC', None, 'Integer', 'Dropout allele count'),
           _Format('INS', None, 'Integer', 'Median insert size'),
           _Format('NF', None, 'Integer', 'Normalization factor for sample DP'))
@@ -75,7 +76,7 @@ GT_FORMATTED = {(2,0,0):'0/0',
 class Reader():
     """Reader for a VCF file, an iterator returning ``_Marker`` objects."""
     def __init__(self, filename, bamlist=None, norm=None, disp=2.5, 
-                 ped=None, samples=None, dpmode=True):
+                 ped=None, samples=None, dpmode=False):
                  
         """Create a new Reader for a VCF file containing GBS data.
 
@@ -119,10 +120,10 @@ class Reader():
     def parse_samples(self, samples_file):
         '''Parse sample list.'''
         samples = []
-        samples_file = open(samples, 'r')
+        samples_file = open(samples_file, 'r')
         for line in samples_file:
-            sample = line.strip()
-            if sample:
+            line = line.strip()
+            if line:
                 samples.append(line)
         return(samples)
 
@@ -135,10 +136,10 @@ class Reader():
             sample, bam = line.split()
             alignments[sample] = _Samfile(bam, sample)
         if set(alignments.keys()) != set(self.samples):
-            message = """Numbers of samples in Reader.alignments and 
-Reader.samples do not agree. GBStools will attempt to use data from the
-vcf for samples without alignment data."""
-            warnings.warn(message, UserWarning)
+            message = ("Numbers of samples in Reader.alignments and " 
+                       "Reader.samples do not agree. GBStools will attempt to "
+                       "use data from the input VCF for the missing samples.")
+            warnings.warn(message, Warning)
         return(alignments)
 
     def parse_norm(self, norm):
@@ -152,16 +153,23 @@ vcf for samples without alignment data."""
         for line in norm:
             line = line.strip()
             fields = line.split()
-            insert = int(fields[0])
-            nf = [float(i) for i in fields[1:]]
-            for i in range(1, len(samples)):
-                normfactors[(samples[i], insert)] = nf[i]
+            insert = fields[0]
+            # In RAD-seq the insert size is random, so ''NA'' is used.
+            if insert == "NA":
+                insert = None
+            # In GBS the expected insert size is known for any given site.
+            else:
+                insert = int(insert)
+            nf_row = [float(i) for i in fields[1:]]
+            for (sample, nf) in zip(samples, nf_row):
+                normfactors[(sample, insert)] = nf
         if set(samples) != set(self.samples):
-            message = """Numbers of samples in Reader.normfactors and 
-Reader.samples do not agree. This may cause DP normalization errors. To fix 
-this problem, either specify a subset of the samples in the vcf to analyze 
-by manually setting Reader.samples, or use a new normfactors file."""
-            warnings.warn(message, UserWarning)
+            message = ("Numbers of samples in Reader.normfactors and "
+                       "Reader.samples do not agree. This may cause DP "
+                       "normalization errors. GBStools will use the "
+                       "default normalization factor (1.0)")
+            warnings.warn(message, Warning)
+            normfactors = None
         return(normfactors)
     
     def parse_ped(self, ped):
@@ -193,26 +201,38 @@ by manually setting Reader.samples, or use a new normfactors file."""
         pos = vcf_record.POS - 1
         ref = vcf_record.REF
         alt = vcf_record.ALT
+        # Make a dict of PyVCF ``_Call`` objects keyed by sample name.
+        vcf_calls = dict(zip(self._reader.samples, vcf_record.samples))
         # Generate a list of ''CallData'' objects in the same order as in vcf.
         calls = []
-        for sample in vcf_record.samples:
-            if sample.sample in self.samples:
+        for sample in self.samples:
+            try:
+                # Get read data directly from bam file.
+                alignment = self.alignments[sample]
+                call = alignment.pileup(chrom, pos, ref, alt[0])
+                # Look up the normalization factor based on insert size.
                 try:
-                    # Get read data directly from bam file.
-                    alignment = self.alignments[sample.sample]
-                    call = alignment.pileup(chrom, pos, ref, alt[0])
-                    # Look up the normalization factor based on insert size.
+                    call.NF = self.normfactors[(sample, call.INS)]
+                except:
+                    call.NF = 1.0
+                calls.append(call)
+            except:
+                try:
+                    # Get read data from VCF.
+                    keys = vcf_calls[sample].data._fields
+                    vals = list(iter(vcf_calls[sample].data))
+                    data = dict(zip(keys, vals))
+                    call = CallData(sample, **data)
                     try:
-                        call.NF = self.normfactors[(sample.sample, call.INS)]
+                        call.NF = self.normfactors[(sample, call.INS)]
                     except:
                         call.NF = 1.0
                     calls.append(call)
                 except:
-                    # Get read data from vcf if bam files were not provided.
-                    keys = sample.data._fields
-                    vals = list(iter(sample.data))
-                    data = dict(zip(keys, vals))
-                    calls.append(CallData(sample.sample, **data))
+                    message = ("Sample ''%s'' not found in user-supplied VCF "
+                               "or in user-supplied list of bam files." % sample)
+                    raise Exception(message)
+                
         # If DP-only mode is being used, set PL to None.
         if self.dpmode:
             for call in calls:
@@ -230,20 +250,14 @@ by manually setting Reader.samples, or use a new normfactors file."""
         info = OrderedDict()
         # Calculate insert size median and MAD.
         inserts = [ins for sample in calls for ins in sample.inserts]
-        try:
+        if inserts:
             ins_med = median(inserts)
             ins_mad = median([abs(ins - ins_med) for ins in inserts])
-            if math.isnan(ins_med):
-                info['InsMed'] = None
-            else:
-                info['InsMed'] = ins_med
-            if math.isnan(ins_mad):
-                info['InsMAD'] = None
-            else:
-                info['InsMAD'] = ins_mad
-        except:
-            info['InsMed'] = None
-            info['InsMAD'] = None
+        else:
+            ins_med = None
+            ins_mad = None
+        info['InsMed'] = ins_med
+        info['InsMAD'] = ins_mad
         # Get fwd and reverse enzymes.
         fwd_rs_list = [rs for sample in calls for rs in sample.fwd_rs]
         rev_rs_list = [rs for sample in calls for rs in sample.rev_rs]
@@ -344,14 +358,13 @@ class Marker():
         self.calls = calls
         self.disp = disp
         self.info = info
-        self.param = []
-        self.null_param = []
+        self.param = {}
         self.lik_ratio = None
         # Initial dropout frequency.
         dfreq = 0.01
-        # Bool indicating allele data is present.        
-        plflag = len([call.PL for call in calls if call.PL]) > 0
-        if plflag:
+        # Bool indicating allele data is missing.
+        dp_mode = bool([call.PL for call in calls if call.PL])
+        if not dp_mode:
             try:
                 af = min(0.9999, self.record.INFO['AF'][0])
             except:
@@ -359,8 +372,8 @@ class Marker():
             phi0 = [(1 - dfreq) * (1 - af), (1 - dfreq) * af, dfreq]
             phi0_null = [1 - af, af, 0]
         else:
-            phi0 = [0, 0, dfreq]
-            phi0_null = [0, 0, 0]
+            phi0 = [1 - dfreq, 0, dfreq]
+            phi0_null = [1, 0, 0]
         dp = sum([call.DP for call in calls])
         missing = sum([call.DP == 0 for call in calls])
         if dp > 0:
@@ -371,38 +384,47 @@ class Marker():
             lambda0 = None
             delta0 = None
             fail = True
-        self.param.append({'phi':phi0, 
-                           'lambda':lambda0,
-                           'delta':delta0,
-                           'converged':False, 
-                           'fail':fail,
-                           'loglik':None})
-        self.null_param.append({'phi':phi0_null, 
-                                'lambda':lambda0,
-                                'delta':delta0,
-                                'converged':False, 
-                                'fail':fail, 
-                                'loglik':None})
+        # Alternative hypothesis initial parameters.
+        self.param['H1'] = [{'phi':phi0, 
+                             'lambda':lambda0,
+                             'delta':delta0,
+                             'fail':fail,
+                             'loglik':None}]
+        # Null hypothesis initial parameters.
+        self.param['H0'] = [{'phi':phi0_null, 
+                             'lambda':lambda0,
+                             'delta':delta0,
+                             'fail':fail, 
+                             'loglik':None}]
+
+    def check_convergence(self, param, phi_tol=0.001, lamb_tol=0.1):
+        '''Check convergence of EM.'''
+        converged = False
+        if param[-1]['fail']:
+            converged = True
+        elif len(param) > 1:
+            phi_diff = (max(abs(param[-1]['phi'][1] - param[-2]['phi'][1]),
+                            abs(param[-1]['phi'][2] - param[-2]['phi'][2])))
+            lamb_diff = abs(param[-1]['lambda'] - param[-2]['lambda'])
+            if phi_diff <= phi_tol and lamb_diff <= lamb_tol:
+                converged = True
+        return(converged)
         
-    def update_param(self, param, phi_tol=0.001, lamb_tol=0.1):
+    def update_param(self, param):
         '''Update the parameter estimates by EM (see GBStools notes).'''
         try:
             param_new = em.update(param[-1], self.calls, self.disp)
-            phi_diff = (max(abs(param_new['phi'][1] - param[-1]['phi'][1]),
-                            abs(param_new['phi'][2] - param[-1]['phi'][2])))
-            lamb_diff = abs(param_new['lambda'] - param[-1]['lambda'])
-            if phi_diff <= phi_tol and lamb_diff <= lamb_tol:
-                param_new['converged'] = True
         except:
-            param_new = param[-1]
+            param_new = param[-1].copy()
             param_new['fail'] = True
         param.append(param_new)
-        return None
+        return(None)
 
     def likelihood_ratio(self):
         '''Null hypothesis: phi[2] == 0. Alt hypothesis: phi[2] > 0.'''
         try:
-            lr = -2.0 * (self.null_param[-1]['loglik'] - self.param[-1]['loglik'])
+            lr = -2.0 * (self.param['H0'][-1]['loglik'] - 
+                         self.param['H1'][-1]['loglik'])
         except:
             lr = None
         return(lr)
@@ -410,15 +432,15 @@ class Marker():
     def update_info(self):
         '''Update the INFO field for the output vcf.'''
         self.info['DLR'] = self.lik_ratio
-        self.info['DFreq'] = self.param[-1]['phi'][2]
-        self.info['AFH1'] = self.param[-1]['phi'][1]
-        self.info['AFH0'] = self.null_param[-1]['phi'][1]
-        self.info['DigestH1'] = self.param[-1]['delta']
-        self.info['DigestH0'] = self.null_param[-1]['delta']
-        self.info['IterationH1'] = len(self.param)
-        self.info['IterationH0'] = len(self.null_param)
-        self.info['EMFailH1'] = self.param[-1]['fail']
-        self.info['EMFailH0'] = self.null_param[-1]['fail']
+        self.info['DFreq'] = self.param['H1'][-1]['phi'][2]
+        self.info['AFH1'] = self.param['H1'][-1]['phi'][1]
+        self.info['AFH0'] = self.param['H0'][-1]['phi'][1]
+        self.info['DigestH1'] = self.param['H1'][-1]['delta']
+        self.info['DigestH0'] = self.param['H0'][-1]['delta']
+        self.info['IterationH1'] = len(self.param['H1'])
+        self.info['IterationH0'] = len(self.param['H0'])
+        self.info['EMFailH1'] = self.param['H1'][-1]['fail']
+        self.info['EMFailH0'] = self.param['H0'][-1]['fail']
         return(None)
 
 class PedMarker():
@@ -444,25 +466,32 @@ class PedMarker():
         for gt in em.trio_gt:
             self.param[gt] = [{'lambda':lambda0,
                                'delta':delta0,
-                               'converged':False, 
                                'fail':fail,
                                'loglik':None}]
+
+    def check_convergence(self, param, lamb_tol=0.25):
+        '''Check convergence of EM.'''
+        converged = False
+        if param[-1]['fail']:
+            converged = True
+        elif len(param) > 1:
+            lamb_diff = abs(param[-1]['lambda'] - param[-2]['lambda'])
+            if lamb_diff <= lamb_tol:
+                converged = True
+        return(converged)
 
     def update_param(self, param, parental_gt, lamb_tol=0.25):
         '''Update the parameter estimates by EM (see GBStools notes).'''
         try:
             param_new = em.ped_update(param[-1], self.calls, self.disp, parental_gt)
-            lamb_diff = abs(param_new['lambda'] - param[-1]['lambda'])
-            if lamb_diff <= lamb_tol:
-                param_new['converged'] = True
         except:
-            param_new = param[-1]
+            param_new = param[-1].copy()
             param_new['fail'] = True
-        # Truncate the EM if the loglik is -inf.
+        # Truncate the EM if the loglik is -inf to save computing time.
         if param_new['loglik'] == -float('Inf'):
             param_new['fail'] = True
         param.append(param_new)
-        return None
+        return(None)
 
     def likelihood_ratio(self):
         '''Null hypothesis: DCount = 0. Alt hypothesis DCount > 0.'''
@@ -575,7 +604,6 @@ class _PileupData():
             ins_med = None
             ins_mad = None
         return(ins_med, ins_mad)
-        
 
     def calculate_pl(self, offset):
         '''Calculate genotype likelihoods and allele depth from reads.'''
