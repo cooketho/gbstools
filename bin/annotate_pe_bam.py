@@ -1,28 +1,33 @@
+#!/usr/bin/env python
 import pysam
 from sys import stdout
-from optparse import OptionParser
+import argparse
 from collections import namedtuple
-
-"""Add the following tags to each read in a bam file:
-Z0: insert/fragment size
-Z1: ligation site
-Z2: enzyme, enzyme_strand, enzyme_pos
-Z3: mate ligation site
-Z4: mate_enzyme, mate_enzyme_strand, mate_enzyme_pos
-"""
 
 # Parse command line arguments from user.
 USAGE = """
-annotate_bam.py -i <input bam file>
-                -o <output bam file>
-                -r <tabix-indexed restriction site bed file> 
-                   (from make_gbstools_bed.py)
+annotate_pe_bam.py -i <input bam file>
+                   -o <output bam file>
+                   -b <tabix-indexed restriction site bed file> (from make_gbsbed.py)
 """
-parser = OptionParser(USAGE)
-parser.add_option('-i',dest='i',help='input bam file')
-parser.add_option('-o',dest='o',help='output bam file')
-parser.add_option('-r',dest='r',help='restriction site bed file')
-(options,args)=parser.parse_args()
+
+DESCRIPTION = """
+Query the mapping positions of reads in a BAM file against a tabix-indexed
+GBSBED file of restriction sites (from make_gbsbed.py). Add the following
+tags to each read (all positions are 0-indexed).
+
+Z0: insert/fragment size (corrected for trimming)
+Z1: ligation site (mapping position of the end base in the SAM ``Template``)
+Z2: enzyme, enzyme_strand, enzyme_pos
+Z3: mate ligation site (mapping position of the opposite end of the SAM ``Template``)
+Z4: mate_enzyme, mate_enzyme_strand, mate_enzyme_pos
+"""
+
+parser = argparse.ArgumentParser(usage=USAGE, description=DESCRIPTION)
+parser.add_argument('-i',dest='i',help='input BAM file', required=True)
+parser.add_argument('-o',dest='o',help='output BAM file', required=True)
+parser.add_argument('-b',dest='b',help='tabix-indexed GBSBED file of restriction sites', required=True)
+args = parser.parse_args()
 
 
 def update_tags(stack_read, reads):
@@ -73,9 +78,9 @@ def fetch_sites(chrom, bed):
 
 
 # Bed file of restriction sites, indexed by tabix.
-restrictbed = pysam.Tabixfile(options.r, 'r')
-inbam = pysam.Samfile(options.i, 'rb')
-outbam = pysam.Samfile(options.o, 'wb', template=inbam)
+restrictbed = pysam.Tabixfile(args.b, 'r')
+inbam = pysam.Samfile(args.i, 'rb')
+outbam = pysam.Samfile(args.o, 'wb', template=inbam)
 # Stack of reads is used to speed up mate pair searches.
 stack = []
 # Max stack size.

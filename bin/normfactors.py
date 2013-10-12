@@ -1,28 +1,30 @@
-from optparse import OptionParser
+#!/usr/bin/env python
+import argparse
 
-"""Parse RS mapping summaries from mapping_summary.py and create
+# Parse command line arguments from user.
+USAGE = """
+normfactors.py --summaries <summarylist> > normfactors.txt
+(summary list is in sample/summary_file format)
+"""
+
+DESCRIPTION = """
+Parse RS mapping summaries from mapping_summary.py and create
 a table of depth-of-coverage normalization factors to be used
 with GBStools.
 """
 
-# Parse command line arguments from user.
-USAGE = """
-normfactors.py --summaries <summarylist> > nf.txt
-(summary list is in sample/summary_file format)
-"""
+parser = argparse.ArgumentParser(usage=USAGE, description=DESCRIPTION)
+parser.add_argument('--summaries', dest='summaries', help='list of mapping summary files', required=True)
+parser.add_argument('--max_insert', dest='max_insert', type=int, default=1000, help='maximum insert size to include in the output file')
+parser.add_argument('--window', dest='window', type=int, default=0, help='sliding window size for smoothing of normalization factors')
+args = parser.parse_args()
 
-parser = OptionParser(USAGE)
-parser.add_option('--summaries', dest='summaries', help='list of mapping summary files')
-parser.add_option('--max_insert', dest='max_insert', type="int", default=1000, help='maximum insert size')
-parser.add_option('--window', dest='window', type="int", default=0, help='sliding window size for smoothing')
-(opt, args) = parser.parse_args()
-
-max_insert = opt.max_insert
-win = opt.window
+max_insert = args.max_insert
+win = args.window
 
 # Parse the rs mapping summaries and store insert counts in a dict.
 counts = {}
-summaries = open(opt.summaries, 'r')
+summaries = open(args.summaries, 'r')
 for line in summaries:
     line = line.strip()
     sample, summary = line.split()

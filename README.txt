@@ -5,6 +5,13 @@ GBStools
 GBStools provides bioinformatics tools for genotyping-by-sequencing data, 
 including allele frequency estimation at variant restriction sites.
 
+Installation
+============
+tar -xvzf GBStools-X.X.X.tar.gz
+cd gbstools
+python setup.py build
+python setup.py install
+
 
 Quick start
 ===========

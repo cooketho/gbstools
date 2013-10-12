@@ -1,22 +1,31 @@
+#!/usr/bin/env python
 import random
 import sys
 from scipy.stats import nbinom
 import math
 import numpy
-from optparse import OptionParser
+import argparse
 
-"""Use GT data in a GBS vcf file to simulate DP, PL, and AD data.
-"""
 USAGE = """
-cat <myvcf> | simulate_geno.py -d <coverage> > <vcf with dp>
+cat <myvcf> | simulate_dp.py --lambda <coverage> > <mynewvcf>
 """
 
-parser = OptionParser(USAGE)
-parser.add_option('-l', '--lambda', dest='lamb', type="int", help='mean depth of coverage')
-(opt, args) = parser.parse_args()
+DESCRIPTION = """
+Use GT data in a GBS vcf file to simulate AD and PL data, where AD values are
+drawn from a negative binomial distribution with mean=lambda and index of
+dispersion=d. For calculating PL, the case call error rate is assumed to be
+0.001 by default.
+"""
 
-numpy.random.seed(0)
-epsilon = 0.001
+parser = argparse.ArgumentParser(usage=USAGE, description=DESCRIPTION)
+parser.add_argument('-l', '--lambda', dest='lamb', type=float, help='mean depth of coverage', required=True)
+parser.add_argument('-d', '--dispersion', dest='d', type=float, default=2.5, help='index of dispersion (default=2.5)')
+parser.add_argument('-e', '--epsilon', dest='epsilon', type=float, default=0.001, help='base call error rate (default=0.001)')
+parser.add_argument('--seed', dest='seed', type=int, default=0, help='seed for random number generator')
+args = parser.parse_args()
+
+numpy.random.seed(args.seed)
+epsilon = args.epsilon
 def calculate_pl(dp_ref, dp_alt):
     """
     Calculate PL field in vcf file from allelic DP
@@ -35,8 +44,8 @@ def calculate_pl(dp_ref, dp_alt):
 
 
 rand = random.Random(0)
-d = 2.5
-lamb = float(opt.lamb)
+d = args.d
+lamb = args.lamb
 for line in sys.stdin:
     line = line.strip()
     if line[0] == '#':

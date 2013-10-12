@@ -1,25 +1,24 @@
+#!/usr/bin/env python
 import sys
-from optparse import OptionParser
+import argparse
 from collections import namedtuple
 
-"""Convert a bed file of restriction sites into a bed-like format used
-by annotate_reads.py and other GBStools scripts.
-"""
-
-# Parse command line arguments from user.
 USAGE = """
-make_gbstools_bed.py -i <input bed file>
-                     -o <output GBSbed file> (default=stdout)
-                     --ligation_offsets <ligation site offsets file> (default=None)
-                     --lig_sort (Sort fwd and rev read ligation sites separately. Default is to sort by recognition site).
+make_gbsbed.py -i <input bed file>
+               -o <output GBSbed file> (default=stdout)
 """
 
-parser = OptionParser(USAGE)
-parser.add_option('-i', '--input', dest='i', default=sys.stdin, help='input bed file')
-parser.add_option('-o', '--output', dest='o', default=sys.stdout, help='output GBSbed file')
-parser.add_option('--ligation_offsets', dest='offsets', default=None, help='file of ligation site offsets from recognition sites')
-parser.add_option('--ligation_sort', dest='ligsort', action="store_true", help='sort fwd and rev ligation sites separately')
-(opt, args) = parser.parse_args()
+DESCRIPTION = """
+Convert a bed file of restriction sites into a bed-like format used by 
+annotate_pe_reads.py and other GBStools scripts.
+"""
+
+parser = argparse.ArgumentParser(usage=USAGE, description=DESCRIPTION)
+parser.add_argument('-i', '--input', dest='i', default=sys.stdin, help='input BED file')
+parser.add_argument('-o', '--output', dest='o', default=sys.stdout, help='output GBSBED file')
+parser.add_argument('--ligation_offsets', dest='offsets', default=None, help='file of ligation site offsets from recognition sites')
+parser.add_argument('--ligation_sort', dest='ligsort', action="store_true", help='sort fwd and rev ligation sites separately')
+args = parser.parse_args()
 
 # Add these values from the restriction site start to get the expected ligation sites.
 # Keyed by (enyzme, strand, read_is_reverse)
@@ -49,9 +48,11 @@ DEFAULT_OFFSETS = {('BpuEI', '+', True): [19, 20],
 offsets = {}
 # Get offsets from the user if they are provided.
 try:
-    offsets = open(opt.offsets, 'r')
+    offsets = open(args.offsets, 'r')
     for line in offsets:
         line = line.strip()
+        if not line or line[0] == "#":
+            continue
         enzyme, strand, read_is_rev, offset = line.split()
         offset = int(offset)
         try:
@@ -59,8 +60,8 @@ try:
         except:
             offsets[(enzyme, strand, read_is_rev)] = [offset]
 except:
-    if opt.offsets:
-        print "Couldn't parse %s. Using default offsets." % opt.offsets
+    if args.offsets:
+        print "Couldn't parse %s. Using default offsets." % args.offsets
     offsets = DEFAULT_OFFSETS
 
 
@@ -79,7 +80,7 @@ class Chromosome():
 
     def merge_sites(self):
         # Sort by the max of the rev ligation sites or the min of the forward sites.
-        if opt.ligsort:
+        if args.ligsort:
             sites_sorted = sorted(self.sites, key=lambda i: i['frag_end'])
         else:
             sites_sorted = self.sites
@@ -120,8 +121,8 @@ class Chromosome():
         return(None)
       
   
-if opt.i != sys.stdin:
-    input = open(opt.i, 'r')
+if args.i != sys.stdin:
+    input = open(args.i, 'r')
 else:
     input = sys.stdin
 

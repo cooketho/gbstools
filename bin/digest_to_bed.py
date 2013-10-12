@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from sys import stdin
 
 """Convert emboss restriction output to BED format.

@@ -1,18 +1,21 @@
-from optparse import OptionParser
+#!/usr/bin/env python
+import argparse
 import pysam
 
-"""Summarize restriction site mapping for a bam file.
-"""
-
-# Parse command line arguments from user.
 USAGE = """
-mapping_summary.py -i <input bam file>
+mapping_summary.py -i <input BAM file>
 """
-parser = OptionParser(USAGE)
-parser.add_option('-i',dest='i',help='input bam file')
-(options,args)=parser.parse_args()
 
-bam = pysam.Samfile(options.i, 'rb')
+DESCRIPTION = """
+Summarize restriction site mapping for a BAM file annotated with
+annotate_pe_bam.py or annotate_se_bam.py.
+"""
+
+parser = argparse.ArgumentParser(usage=USAGE, description=DESCRIPTION)
+parser.add_argument('-i',dest='i',help='input bam file', required=True)
+args = parser.parse_args()
+
+bam = pysam.Samfile(args.i, 'rb')
 enzyme_counts = {}
 insert_counts = {}
 # Keyed by: no. mapped, no. mapped to restriction site.
@@ -22,7 +25,7 @@ read_counts = {0:{0:0, 1:0, 2:0},
 
 print "# file: %s" % options.i
 print "#"
-for read in bam.fetch():
+for read in bam:
     tags = dict(read.tags)
     enzyme1, enzyme2, insert = None, None, None
     try:

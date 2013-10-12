@@ -1,28 +1,30 @@
-from optparse import OptionParser
+#!/usr/bin/env python
 import random
 import numpy
+import argparse
 from collections import namedtuple
 
-"""Draw random genotypes for two parents, M and F, including
-dropout alleles, and draw random genotypes for their offspring.
-Output in VCF format.
-"""
-
-# Parse command line arguments from user.
 USAGE = """
 simulate_ped_vcf.py --samples <number of samples>
                     --sites <number of sites>
 """
 
-parser = OptionParser(USAGE)
-parser.add_option('-n', '--samples', dest='n', type='int', help='number of samples')
-parser.add_option('-N', '--sites', dest='N', type='int', help='number of sites')
-(opt, args) = parser.parse_args()
+DESCRIPTION = """
+Draw random genotypes for two parents, named ``M`` and ``F``, including
+dropout alleles, and draw random genotypes for their offspring named
+``0``...``N``. Output in VCF format.
+"""
 
-n = opt.n
-N = opt.N
-rand = random.Random(0)
-numpy.random.seed(0)
+parser = argparse.ArgumentParser(usage=USAGE, description=DESCRIPTION)
+parser.add_argument('-n', '--samples', dest='n', type=int, help='number of samples', required=True)
+parser.add_argument('-N', '--sites', dest='N', type=int, help='number of sites', required=True)
+parser.add_argument('--seed', dest='seed', type=int, default=0, help='random seed')
+args = parser.parse_args()
+
+n = args.n
+N = args.N
+rand = random.Random(args.seed)
+numpy.random.seed(args.seed)
 
 # Defined as ('A' count, 'a', count, '-' count) (see GBStools notes).
 GENOTYPES = ((2,0,0),

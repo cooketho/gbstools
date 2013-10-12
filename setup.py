@@ -30,6 +30,11 @@ except ImportError:
     requires.append('scipy')
 
 try:
+    import argparse
+except ImportError:
+    requires.appen('argparse')
+
+try:
     from Cython.Distutils import build_ext
     CYTHON = True
 except ImportError:
@@ -47,8 +52,8 @@ else:
 scripts = ['bin/annotate_pe_bam.py',
            'bin/annotate_se_bam.py',
            'bin/digest_to_bed.py',
-           'bin/likelihood_ratio.py',
-           'bin/make_gbstools_bed.py',
+           'bin/polymorphism_test.py',
+           'bin/make_gbsbed.py',
            'bin/mapping_summary.py',
            'bin/normfactors.py',
            'bin/simulate_dp.py',
