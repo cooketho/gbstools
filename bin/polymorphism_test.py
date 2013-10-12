@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import re
 import sys
 import argparse
 import gbstools
@@ -26,6 +27,7 @@ parser.add_argument('-n', '--normfactors', dest='nf', default=None, help='normal
 parser.add_argument('-s', '--samples', dest='samples', default=None, help='samples to include (excluded samples will remain in output VCF, but will not be used in EM)')
 parser.add_argument('--dpmode',dest='dpmode', action="store_true", help='use DP data only; ignore PL data from VCF')
 parser.add_argument('--ped',dest='ped', default=None, help='PED file for nuclear family (when specified, pedigree-mode is used)')
+parser.add_argument('--intervals',dest='intervals', default=None, type=str, help='samtools-style intervals (e.g. chr1:1-1000)')
 args = parser.parse_args()
 
 if args.o:
@@ -38,7 +40,22 @@ reader = gbstools.Reader(filename=args.i, bamlist=args.bamlist, norm=args.nf,
                          dpmode=args.dpmode)
 writer = gbstools.Writer(outstream, template=reader)
 
-for snp in reader:
+try:
+   intervals = re.split('[:-]', args.intervals)
+   chrom = intervals.pop(0)
+   try:
+      start = int(intervals.pop(0))
+   except:
+      start = None
+   try:
+      end = int(intervals.pop(0))
+   except:
+      end = None
+   snps = reader.fetch(chrom, start, end)
+except:
+   snps = (snp for snp in reader)
+
+for snp in snps:
    if not reader.family:
       while not snp.check_convergence(snp.param['H1']):
          snp.update_param(snp.param['H1'])
