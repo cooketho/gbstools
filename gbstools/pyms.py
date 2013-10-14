@@ -8,13 +8,16 @@ import random
 
 class Reader():
     """Parser class for MS output files. Generates ``Sample`` objects."""
-    def __init__(self, msfile, N=500, L=6, readlen=101, variantsonly=False):
+    def __init__(self, msfile, fraglen=500, sitelen=6, readlen=101, variantsonly=False):
         self.msfile = msfile
-        self.header = self.parse_header()
+        self.samples = None
+        self.seeds = None
+        self.command = None
+        self.parse_header()
         # Length of GBS fragment.
-        self.N = N
+        self.fraglen = fraglen
         # Length of restriction site.
-        self.L = L
+        self.sitelen = sitelen
         self.readlen = readlen
         # Flag=true when each site has a segregating restriction site variant.
         self.variantsonly = variantsonly
@@ -24,13 +27,17 @@ class Reader():
     def parse_header(self):
         '''Parse the header line of the MS output file.'''
         header = []
-        for line in self.msfile:
+        line = self.msfile.readline()
+        line = line.strip()
+        fields = line.split()
+        self.samples = int(fields[1])
+        self.command = line
+        line = self.msfile.readline()
+        self.seeds = line.strip()
+        while line != '//':
+            line = self.msfile.readline()
             line = line.strip()
-            if line == '//':
-                break
-            elif line:
-                header.append(line)
-        return(header)
+        return(None)
 
     def __iter__(self):
         return(self)
@@ -52,23 +59,25 @@ class Reader():
                 segsites = int(fields[1])
             elif fields[0] == 'positions:':
                 # Convert the MS position field to integers in sequence 0-N.
-                positions = [int(self.N * float(pos)) for pos in fields[1:]]
+                positions = [int(self.fraglen * float(pos)) for pos in fields[1:]]
             else:
                 # Record the individual haplotypes.
                 haplotypes.append([int(i) for i in list(fields[0])])
         if segsites != None:
             # Create a "Sample" object.
-            return(Sample(segsites, positions, haplotypes, self.N, self.L, self.readlen, self.variantsonly, self.rand))
+            return(Sample(segsites, positions, haplotypes, self.fraglen, 
+                          self.sitelen, self.readlen, self.variantsonly, self.rand))
         raise StopIteration
 
 class Sample():
     """Class for storing and manipulating data from one MS coalescent sample."""
-    def __init__(self, segsites, positions, haplotypes, N, L, readlen, variantsonly, rand):
+    def __init__(self, segsites, positions, haplotypes, fraglen, sitelen, 
+                 readlen, variantsonly, rand):
         self.segsites = segsites
         self.positions = positions
         self.haplotypes = haplotypes
-        self.N = N    # Number of samples.
-        self.L = L    # Length of restriction site.
+        self.fraglen = fraglen    # Number of samples.
+        self.sitelen = sitelen    # Length of restriction site.
         self.readlen = readlen
         self.variantsonly = variantsonly
         self.rand = rand
@@ -87,12 +96,12 @@ class Sample():
         else:
             for pos in self.positions:
                 # Assume positions in the first L and last L bp of the fragment are restriction sites.
-                if pos <= self.L or pos >= self.N - self.L:
+                if pos <= self.sitelen or pos >= self.fraglen - self.sitelen:
                     # For the restriction site it's equally likely that the derived allele is '-' or '+'.
                     minus_haplotype.append(self.rand.choice((0,1)))
                 else:
                     # SNPs in interior of N bp fragment can also result in '-' haplotype.
-                    if self.rand.random() < 0.25 ** self.L * 2:    # Approximate chance of seeing a restriction site at any given base.
+                    if self.rand.random() < 0.25 ** self.sitelen * 2:    # Approximate chance of seeing a restriction site at any given base.
                         minus_haplotype.append(self.rand.choice((0,1)))
                     else:
                         minus_haplotype.append(None)
@@ -106,10 +115,12 @@ class Sample():
             indices = []
             for i in range(self.segsites):
                 # Forward read indices.
-                if self.positions[i] > self.L and self.positions[i] <= self.L + self.readlen:
+                if (self.positions[i] > self.sitelen and 
+                    self.positions[i] <= self.sitelen + self.readlen):
                     indices.append(i)
                 # Reverse read indices.
-                elif self.positions[i] >= self.N - (self.L + self.readlen) and self.positions < self.N - self.L:
+                elif (self.positions[i] >= self.fraglen - (self.sitelen + self.readlen) and 
+                      self.positions < self.fraglen - self.sitelen):
                     indices.append(i)
 
             # Get haplotypes.
