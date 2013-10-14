@@ -223,10 +223,11 @@ class Reader():
                     vals = list(iter(vcf_calls[sample].data))
                     data = dict(zip(keys, vals))
                     call = CallData(sample, **data)
-                    try:
-                        call.NF = self.normfactors[(sample, call.INS)]
-                    except:
-                        call.NF = 1.0
+                    if self.normfactors:
+                        try:
+                            call.NF = self.normfactors[(sample, call.INS)]
+                        except:
+                            call.NF = 1.0
                     calls.append(call)
                 except:
                     message = ("Sample ''%s'' not found in user-supplied VCF "
@@ -651,7 +652,11 @@ class CallData():
             self.PL = [int(i) for i in pl]
         else:
             self.PL = None
-        self.NF = kwargs.pop('NF', 1.0)
+        nf = kwargs.pop('NF', 1.0)
+        try:
+            self.NF = float(nf)
+        except:
+            self.NF = 1.0
         self.inserts = kwargs.pop('inserts', [])
         self.INS = kwargs.pop('INS', None)
         self.fwd_rs = kwargs.pop('fwd_rs', [])
