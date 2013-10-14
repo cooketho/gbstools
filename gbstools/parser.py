@@ -363,17 +363,17 @@ class Marker():
         # Initial dropout frequency.
         dfreq = 0.01
         # Bool indicating allele data is missing.
-        dp_mode = bool([call.PL for call in calls if call.PL])
-        if not dp_mode:
+        dp_mode = not bool([call.PL for call in calls if call.PL])
+        if dp_mode:
+            phi0 = [1 - dfreq, 0, dfreq]
+            phi0_null = [1, 0, 0]
+        else:
             try:
                 af = min(0.9999, self.record.INFO['AF'][0])
             except:
                 af = 0.01
-            phi0 = [(1 - dfreq) * (1 - af), (1 - dfreq) * af, dfreq]
+            phi0 = [(1 - af) * (1 - dfreq), af * (1 - dfreq), dfreq]
             phi0_null = [1 - af, af, 0]
-        else:
-            phi0 = [1 - dfreq, 0, dfreq]
-            phi0_null = [1, 0, 0]
         dp = sum([call.DP for call in calls])
         missing = sum([call.DP == 0 for call in calls])
         if dp > 0:
