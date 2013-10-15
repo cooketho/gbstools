@@ -21,10 +21,11 @@ frequency at restriction sites.
 parser = argparse.ArgumentParser(usage=USAGE, description=DESCRIPTION)
 parser.add_argument('-i', '--input', dest='i', help='input VCF file containing GBS SNPs (sites with >2 alleles will be ignored)', required=True)
 parser.add_argument('-o', '--output', dest='o', default=None, help='output VCF file (default is stdout)')
-parser.add_argument('-d', '--dispersion', dest='disp', default=2.5, type=float, help='dispersion index used in GBStools EM (default=2.5)')
 parser.add_argument('-b', '--bam', dest='bamlist', default=None, help='list of sample/bam file pairs (use bam files instead of VCF to get alignment data)')
 parser.add_argument('-n', '--normfactors', dest='nf', default=None, help='normalization factors file used in GBStools EM (produced by normfactors.py)')
 parser.add_argument('-s', '--samples', dest='samples', default=None, help='samples to include (excluded samples will remain in output VCF, but will not be used in EM)')
+parser.add_argument('--dispersion_slope', dest='disp_slope', default=0.0, type=float, help='slope for linear function of dispersion index vs mean coverage')
+parser.add_argument('--dispersion_intercept', dest='disp_intercept', default=2.5, type=float, help='intecept for linear function of dispersion index vs mean coverage')
 parser.add_argument('--dpmode',dest='dpmode', action="store_true", help='use DP data only; ignore PL data from VCF')
 parser.add_argument('--ped',dest='ped', default=None, help='PED file for nuclear family (when specified, pedigree-mode is used)')
 parser.add_argument('--intervals',dest='intervals', default=None, type=str, help='samtools-style intervals (e.g. chr1:1-1000)')
@@ -37,8 +38,9 @@ else:
    outstream = sys.stdout
 
 reader = gbstools.Reader(filename=args.i, bamlist=args.bamlist, norm=args.nf, 
-                         disp=args.disp, ped=args.ped, samples=args.samples,
-                         dpmode=args.dpmode)
+                         disp_slope=args.disp_slope, disp_intercept=args.disp_intercept,
+                         ped=args.ped, samples=args.samples, dpmode=args.dpmode)
+                         
 writer = gbstools.Writer(outstream, template=reader)
 
 try:

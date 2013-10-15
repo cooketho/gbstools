@@ -75,8 +75,8 @@ GT_FORMATTED = {(2,0,0):'0/0',
 
 class Reader():
     """Reader for a VCF file, an iterator returning ``_Marker`` objects."""
-    def __init__(self, filename, bamlist=None, norm=None, disp=2.5, 
-                 ped=None, samples=None, dpmode=False):
+    def __init__(self, filename, bamlist=None, norm=None, disp_intercept=2.5, 
+                 disp_slope=0.0, ped=None, samples=None, dpmode=False):
                  
         """Create a new Reader for a VCF file containing GBS data.
 
@@ -108,7 +108,7 @@ class Reader():
             self.normfactors = self.parse_norm(norm)
         except:
             self.normfactors = None
-        self.disp = disp
+        self.disp = (disp_slope, disp_intercept)
         # Should DP-only mode be used?
         self.dpmode = dpmode
         # Get family info from PED file if it exists.
@@ -280,7 +280,7 @@ class Reader():
         if not self.family:
             marker = Marker(rec=vcf_record, calls=calls, disp=self.disp, info=info)
         else:
-            marker = PedMarker(rec=vcf_record, calls=calls, disp=self.disp, 
+            marker = PedMarker(rec=vcf_record, calls=calls, disp=self.disp,
                                info=info, family=self.family)
         return(marker)
 
@@ -303,7 +303,7 @@ class Writer():
                 self.template.infos[info.id] = info
         for format in FORMAT:
             self.template.formats[format.id] = format
-        analysis = "input_file=%s dispersion=%f" % (filename, disp)
+        analysis = "input_file=%s disp_slope=%f disp_intercept=%f" % (filename, disp[0], disp[1])
         self.template.metadata['GBStools'] = [analysis]
         self.writer = vcf.Writer(outstream, self.template, lineterminator)
         
@@ -414,7 +414,8 @@ class Marker():
     def update_param(self, param):
         '''Update the parameter estimates by EM (see GBStools notes).'''
         try:
-            param_new = em.update(param[-1], self.calls, self.disp)
+            disp = param[-1]['lambda'] * self.disp[0] + self.disp[1]
+            param_new = em.update(param[-1], self.calls, disp)
         except:
             param_new = param[-1].copy()
             param_new['fail'] = True
@@ -483,7 +484,8 @@ class PedMarker():
     def update_param(self, param, parental_gt, lamb_tol=0.25):
         '''Update the parameter estimates by EM (see GBStools notes).'''
         try:
-            param_new = em.ped_update(param[-1], self.calls, self.disp, parental_gt)
+            disp = param[-1]['lambda'] * self.disp[0] + self.disp[1]
+            param_new = em.ped_update(param[-1], self.calls, disp, parental_gt)
         except:
             param_new = param[-1].copy()
             param_new['fail'] = True

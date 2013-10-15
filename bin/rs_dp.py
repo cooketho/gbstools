@@ -8,7 +8,9 @@ rs_dp.py -i <input BAM file> -b <GBSBED file of restriction sites> -n <normfacto
 """
 
 DESCRIPTION = """
-Calculate raw and normalized coverage at restriction sites
+Parse reads in a BAM file and calculate depth of coverage at restriction sites
+in a GBSBED file. Also calculate normalized depth of coverage according to the
+normalization factors provided by the user.
 """
 
 parser = argparse.ArgumentParser(usage=USAGE, description=DESCRIPTION)
