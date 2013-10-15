@@ -28,6 +28,7 @@ parser.add_argument('-s', '--samples', dest='samples', default=None, help='sampl
 parser.add_argument('--dpmode',dest='dpmode', action="store_true", help='use DP data only; ignore PL data from VCF')
 parser.add_argument('--ped',dest='ped', default=None, help='PED file for nuclear family (when specified, pedigree-mode is used)')
 parser.add_argument('--intervals',dest='intervals', default=None, type=str, help='samtools-style intervals (e.g. chr1:1-1000)')
+parser.add_argument('--debug',dest='debug', action='store_true', help='use debug mode')
 args = parser.parse_args()
 
 if args.o:
@@ -58,19 +59,42 @@ except:
 for snp in snps:
    if not reader.family:
       while not snp.check_convergence(snp.param['H1']):
-         snp.update_param(snp.param['H1'])
-         if len(snp.param['H1']) > 40:
+         param = snp.update_param(snp.param['H1'])
+         snp.param['H1'].append(param)
+         if len(snp.param['H1']) > 30:
             snp.param['H1'][-1]['fail'] = True
+      param = snp.update_param(snp.param['H1'])
+      snp.param['H1'][-1]['loglik'] = param['loglik']
+
       while not snp.check_convergence(snp.param['H0']):
-         snp.update_param(snp.param['H0'])
-         if len(snp.param['H0']) > 40:
+         param = snp.update_param(snp.param['H0'])
+         snp.param['H0'].append(param)
+         if len(snp.param['H0']) > 30:
             snp.param['H0'][-1]['fail'] = True
+      param = snp.update_param(snp.param['H0'])
+      snp.param['H0'][-1]['loglik'] = param['loglik']
+
    else:
       for gt in snp.param:
          while not snp.check_convergence(snp.param[gt]):
-            snp.update_param(param=snp.param[gt], parental_gt=gt)
-            if len(snp.param[gt]) > 40:
+            param = snp.update_param(param=snp.param[gt], parental_gt=gt)
+            snp.param[gt].append(param)
+            if len(snp.param[gt]) > 30:
                snp.param[gt][-1]['fail'] = True
+         param = snp.update_param(snp.param[gt])
+         snp.param[gt][-1]['loglik'] = param['loglik']
+
    snp.lik_ratio = snp.likelihood_ratio()
    snp.update_info()
+
+   if args.debug:
+      print 'H0:'
+      for param in snp.param['H0']:
+         print param
+      print 'H1:'
+      for param in snp.param['H1']:
+         print param
+      print 'DP: %s' % str([call.DP for call in snp.calls])
+      print 'PL: %s' % str([call.PL for call in snp.calls])
+      print 'NF: %s' % str([call.NF for call in snp.calls])
    writer.write_record(snp)

@@ -16,11 +16,8 @@ Use MS results to simulate variation at restriction sites in GBS data.
 """
 
 parser = argparse.ArgumentParser(usage=USAGE, description=DESCRIPTION)
-<<<<<<< HEAD
 parser.add_argument('--draws', dest='draws', type=int, help='number of random draws by ms')
 parser.add_argument('--samples', dest='n', type=int, help='number of diploid samples')
-=======
->>>>>>> de924983a91b2ca1e891ef0a0ac0c4a5708b43b1
 parser.add_argument('-t', '--theta', dest='t', type=float, help='scaled mutation rate theta')
 parser.add_argument('-i', '--input', dest='input', default=None, help='ms results file to use as input')
 parser.add_argument('--frag_len', dest='frag_len', type=int, default=500, help='mean digest fragment length (default=500)')

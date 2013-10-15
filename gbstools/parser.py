@@ -418,8 +418,7 @@ class Marker():
         except:
             param_new = param[-1].copy()
             param_new['fail'] = True
-        param.append(param_new)
-        return(None)
+        return(param_new)
 
     def likelihood_ratio(self):
         '''Null hypothesis: phi[2] == 0. Alt hypothesis: phi[2] > 0.'''
@@ -491,8 +490,7 @@ class PedMarker():
         # Truncate the EM if the loglik is -inf to save computing time.
         if param_new['loglik'] == -float('Inf'):
             param_new['fail'] = True
-        param.append(param_new)
-        return(None)
+        return(param_new)
 
     def likelihood_ratio(self):
         '''Null hypothesis: DCount = 0. Alt hypothesis DCount > 0.'''

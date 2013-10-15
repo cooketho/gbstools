@@ -12,10 +12,6 @@ GENO = ((2,0,0),
         (0,2,0),
         (0,1,1),
         (0,0,2))
-# For running EM without PL data.
-GENO_DPMODE = ((2,0,0),
-               (1,0,1),
-               (0,0,2))
 
 # Make a hash of combinations to avoid redundant calculation.
 choose = {}
@@ -69,13 +65,6 @@ trio_gt = trio_genotypes(GENO)
 def update(param, calls, disp):
     '''Update parameters by EM.'''
     n = len(calls)    # Number of samples.
-    # If there is no PL data, use DP-mode.
-    if [call.PL for call in calls if call.PL]:
-        dp_mode = False
-        genotypes = GENO
-    else:
-        dp_mode = True
-        genotypes = GENO_DPMODE
     # Initialize counter variables for phi, delta, lambda, loglik.
     phi = [0, 0, 0]
     delta = 0
@@ -83,20 +72,19 @@ def update(param, calls, disp):
     lamb_denom = 0
     loglik = 0
     for call in calls:
+        keys = []
         sample_lik = {}
         for z in (0, 1):
-            for g in genotypes:
+            for g in GENO:
                 m = (2.0 - g[2])    # Apparent ploidy, given g.
                 mu = param['lambda'] * call.NF * z * m / 2    # Expected coverage.
                 psi = mu / (disp - 1)    # Size parameter for nbinom.
-                if dp_mode:
-                    D_lik = 0
-                else:
-                    D_lik = dreads(g, call.PL)    # Read data likelihood.
+                D_lik = dreads(g, call.PL)    # Read data likelihood.
                 d_lik = dnbinom(call.DP, mu, psi)    # Coverage likelihood.
                 g_lik = dmultinom(g, param['phi'])    # Genotype likelihood.
                 z_lik = dbernoulli(z, param['delta'])    # Digest fail likelihood.
                 sample_lik[(z, g, psi)] = D_lik + d_lik + g_lik + z_lik
+                keys.append((z, g, psi))
         # Normalize the likelihoods by likmax to avoid underflow.
         likmax = max(sample_lik.values())
         liksum = sum([exp(l - likmax) for l in sample_lik.values()])
