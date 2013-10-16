@@ -108,7 +108,7 @@ class Reader():
             self.normfactors = self.parse_norm(norm)
         except:
             self.normfactors = None
-        self.disp = (disp_slope, disp_intercept)
+        self.disp = {'slope':disp_slope, 'intercept':disp_intercept}
         # Should DP-only mode be used?
         self.dpmode = dpmode
         # Get family info from PED file if it exists.
@@ -303,7 +303,9 @@ class Writer():
                 self.template.infos[info.id] = info
         for format in FORMAT:
             self.template.formats[format.id] = format
-        analysis = "input_file=%s disp_slope=%f disp_intercept=%f" % (filename, disp[0], disp[1])
+        analysis = ''.join(("input_file=%s " % filename,
+                            "disp_slope=%f " % disp['slope'],
+                            "disp_intercept=%f" % disp['intercept']))
         self.template.metadata['GBStools'] = [analysis]
         self.writer = vcf.Writer(outstream, self.template, lineterminator)
         
@@ -357,7 +359,6 @@ class Marker():
     def __init__(self, rec, calls, disp, info):
         self.record = rec
         self.calls = calls
-        self.disp = disp
         self.info = info
         self.param = {}
         self.lik_ratio = None
@@ -379,10 +380,12 @@ class Marker():
         missing = sum([call.DP == 0 for call in calls])
         if dp > 0:
             lambda0 = float(dp) / (len(calls) - missing)
+            self.disp = disp['slope'] * lambda0 + disp['intercept']
             delta0 = max(float(missing) / len(calls), 0.01)
             fail = False
         else:
             lambda0 = None
+            self.disp = None
             delta0 = None
             fail = True
         # Alternative hypothesis initial parameters.
@@ -414,8 +417,7 @@ class Marker():
     def update_param(self, param):
         '''Update the parameter estimates by EM (see GBStools notes).'''
         try:
-            disp = param[-1]['lambda'] * self.disp[0] + self.disp[1]
-            param_new = em.update(param[-1], self.calls, disp)
+            param_new = em.update(param[-1], self.calls, self.disp)
         except:
             param_new = param[-1].copy()
             param_new['fail'] = True
@@ -449,7 +451,6 @@ class PedMarker():
     def __init__(self, rec, calls, disp, info, family):
         self.record = rec
         self.calls = calls
-        self.disp = disp
         self.info = info
         self.family = family
         self.param = {}
@@ -458,10 +459,12 @@ class PedMarker():
         missing = sum([call.DP == 0 for call in calls])
         if dp > 0:
             lambda0 = float(dp) / (len(calls) - missing)
+            self.disp = disp['slope'] * lambda0 + disp['intercept']
             delta0 = max(float(missing) / len(calls), 0.01)
             fail = False
         else:
             lambda0 = None
+            self.disp = None
             delta0 = None
             fail = True
         for gt in em.trio_gt:
@@ -484,8 +487,7 @@ class PedMarker():
     def update_param(self, param, parental_gt, lamb_tol=0.25):
         '''Update the parameter estimates by EM (see GBStools notes).'''
         try:
-            disp = param[-1]['lambda'] * self.disp[0] + self.disp[1]
-            param_new = em.ped_update(param[-1], self.calls, disp, parental_gt)
+            param_new = em.ped_update(param[-1], self.calls, self.disp, parental_gt)
         except:
             param_new = param[-1].copy()
             param_new['fail'] = True
