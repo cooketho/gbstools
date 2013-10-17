@@ -38,8 +38,8 @@ INFO = (_Info('DLR', None, 'Float', 'Dropout likelihood ratio (GBStools)'),
         _Info('IterationH0', None, 'Integer', 'Number of alt hypothesis EM iterations (GBStools)'),
         _Info('FailH1', None, 'Flag', 'EM failure flag'),
         _Info('FailH0', None, 'Flag', 'Null hypothesis EM failure flag'),
-        _Info('FwdRS', None, 'String', 'Recognition sites for forward reads'),
-        _Info('RevRS', None, 'String', 'Recognition sites for reverse reads'),
+        _Info('SelfRS', None, 'String', 'Recognition sites for reads mapped to the SNP'),
+        _Info('MateRS', None, 'String', 'Recognition sites for mate pairs of reads mapped to the SNP'),
         _Info('InsMed', None, 'Float', 'Insert size median'),
         _Info('InsMAD', None, 'Float', 'Insert size MAD'))
 
@@ -55,8 +55,8 @@ PEDINFO = (_Info('DLR', None, 'Float', 'Dropout likelihood ratio (GBStools)'),
            _Info('IterationH0', None, 'Integer', 'Number of alt hypothesis EM iterations for MLE parental genotypes (GBStools)'),
            _Info('FailH1', None, 'Flag', 'EM failure flag'),
            _Info('FailH0', None, 'Flag', 'Null hypothesis EM failure flag'),
-           _Info('FwdRS', None, 'String', 'Recognition sites for forward reads'),
-           _Info('RevRS', None, 'String', 'Recognition sites for reverse reads'),
+           _Info('SelfRS', None, 'String', 'Recognition sites for reads mapped to the SNP'),
+           _Info('MateRS', None, 'String', 'Recognition sites for mate pairs of reads mapped to the SNP'),
            _Info('InsMed', None, 'Float', 'Insert size median'),
            _Info('InsMAD', None, 'Float', 'Insert size MAD'))
 
@@ -259,21 +259,21 @@ class Reader():
             ins_mad = None
         info['InsMed'] = ins_med
         info['InsMAD'] = ins_mad
-        # Get fwd and reverse enzymes.
-        fwd_rs_list = [rs for sample in calls for rs in sample.fwd_rs]
-        rev_rs_list = [rs for sample in calls for rs in sample.rev_rs]
+        # Get self and mate enzymes.
+        self_rs_list = [rs for sample in calls for rs in sample.self_rs]
+        mate_rs_list = [rs for sample in calls for rs in sample.mate_rs]
         try:
-            fwd_rs_tally = Counter(fwd_rs_list).most_common(1)
-            fwd_rs, count = fwd_rs_tally.pop()
-            fwd_rs = fwd_rs.replace(';', ',')
-            info['FwdRS'] = "%s,%i" % (fwd_rs, count)
+            self_rs_tally = Counter(self_rs_list).most_common(1)
+            self_rs, count = self_rs_tally.pop()
+            self_rs = self_rs.replace(';', ',')
+            info['SelfRS'] = "%s,%i" % (self_rs, count)
         except:
             pass
         try:
-            rev_rs_tally = Counter(rev_rs_list).most_common(1)
-            rev_rs, count = rev_rs_tally.pop()
-            rev_rs = rev_rs.replace(';', ',')
-            info['RevRS'] = "%s,%i" % (rev_rs, count)
+            mate_rs_tally = Counter(mate_rs_list).most_common(1)
+            mate_rs, count = mate_rs_tally.pop()
+            mate_rs = mate_rs.replace(';', ',')
+            info['MateRS'] = "%s,%i" % (mate_rs, count)
         except:
             pass
         # Generate ''Marker'' or ''PedMarker'' object.
@@ -581,22 +581,22 @@ class _PileupData():
             self.alt = None
             self.data['PL'] = None
         # Extract info from read tags.
-        inserts, fwd_rs, rev_rs = self.extract_tags()
+        inserts, self_rs, mate_rs = self.extract_tags()
         self.data['inserts'] = inserts
         if inserts:
             self.data['INS'] = median(inserts)
         else:
             self.data['INS'] = None
-        self.data['fwd_rs'] = fwd_rs
-        self.data['rev_rs'] = rev_rs
+        self.data['self_rs'] = self_rs
+        self.data['mate_rs'] = mate_rs
 
     def extract_tags(self):
         '''Extract insert and enzyme info from read tags (see annotate_bam.py).'''
         tags = [dict(read.alignment.tags) for read in self.reads]
         inserts = [tag['Z0'] for tag in tags if 'Z0' in tag]
-        fwd_rs = [tag['Z2'] for tag in tags if 'Z2' in tag]
-        rev_rs = [tag['Z4'] for tag in tags if 'Z4' in tag]
-        return(inserts, fwd_rs, rev_rs)
+        self_rs = [tag['Z2'] for tag in tags if 'Z2' in tag]
+        mate_rs = [tag['Z4'] for tag in tags if 'Z4' in tag]
+        return(inserts, self_rs, mate_rs)
 
     def calculate_insert_med(self):
         '''Calculate insert size before read trimming.'''
@@ -661,8 +661,8 @@ class CallData():
             self.NF = 1.0
         self.inserts = kwargs.pop('inserts', [])
         self.INS = kwargs.pop('INS', None)
-        self.fwd_rs = kwargs.pop('fwd_rs', [])
-        self.rev_rs = kwargs.pop('rev_rs', [])
+        self.self_rs = kwargs.pop('self_rs', [])
+        self.mate_rs = kwargs.pop('mate_rs', [])
         self.is_father = False
         self.is_mother = False
         self.is_child = False
