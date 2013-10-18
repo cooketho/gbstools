@@ -422,9 +422,9 @@ class Marker():
         
     def update_param(self, param):
         '''Update the parameter estimates by EM (see GBStools notes).'''
-        if True:
+        try:
             param_new = em.update(param[-1], self.calls, self.disp)
-        else:
+        except:
             param_new = param[-1].copy()
             param_new['fail'] = True
         return(param_new)

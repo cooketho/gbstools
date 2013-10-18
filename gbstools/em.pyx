@@ -257,8 +257,7 @@ cdef lambda_numer(g, z, d, r, lamb, psi):
     return(val)
 
 
-#cdef lambda_denom(g, z, d, r, lamb, psi):
-def lambda_denom(g, z, d, r, lamb, psi):
+cdef lambda_denom(g, z, d, r, lamb, psi):
     '''Function to calculate denominator in EM lambda update (see GBStools notes).'''
     m = 2.0 - g[2]
     if m * z == 0:
