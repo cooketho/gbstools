@@ -72,8 +72,8 @@ def update(param, calls, disp):
     lamb_denom = 0
     loglik = 0
     for call in calls:
-        keys = []
         sample_lik = {}
+        sample_psi = {}
         for z in (0, 1):
             for g in GENO:
                 m = (2.0 - g[2])    # Apparent ploidy, given g.
@@ -83,22 +83,23 @@ def update(param, calls, disp):
                 d_lik = dnbinom(call.DP, mu, psi)    # Coverage likelihood.
                 g_lik = dmultinom(g, param['phi'])    # Genotype likelihood.
                 z_lik = dbernoulli(z, param['delta'])    # Digest fail likelihood.
-                sample_lik[(z, g, psi)] = D_lik + d_lik + g_lik + z_lik
-                keys.append((z, g, psi))
+                sample_lik[(z, g)] = D_lik + d_lik + g_lik + z_lik
+                sample_psi[(z, g)] = psi
         # Normalize the likelihoods by likmax to avoid underflow.
         likmax = max(sample_lik.values())
         liksum = sum([exp(l - likmax) for l in sample_lik.values()])
-        for z, g, psi in sample_lik:
-            lik = exp(sample_lik[(z, g, psi)] - likmax)
+        for z, g in sample_lik:
+            psi = sample_psi[(z, g)]
+            normlik = exp(sample_lik[(z, g)] - likmax)
             # Update the counter variables.
-            phi[0] += g[0] * lik / (2 * n * liksum)
-            phi[1] += g[1] * lik / (2 * n * liksum)
-            phi[2] += g[2] * lik / (2 * n * liksum)
-            delta += (1 - z) * lik / (n * liksum)
+            phi[0] += g[0] * normlik / (2 * n * liksum)
+            phi[1] += g[1] * normlik / (2 * n * liksum)
+            phi[2] += g[2] * normlik / (2 * n * liksum)
+            delta += (1 - z) * normlik / (n * liksum)
             lamb_numer += (lambda_numer(g, z, call.DP, call.NF, param['lambda'], psi) *
-                           lik / liksum)
+                           normlik / liksum)
             lamb_denom += (lambda_denom(g, z, call.DP, call.NF, param['lambda'], psi) *
-                           lik / liksum)
+                           normlik / liksum)
         try:
             loglik += log(sum([exp(l) for l in sample_lik.values()]))
         except:
@@ -109,7 +110,7 @@ def update(param, calls, disp):
                     'lambda':lamb, 
                     'fail':param['fail'], 
                     'loglik':loglik}
-    return(param_update)            
+    return(param_update)
 
 
 def ped_update(param, calls, disp, parental_gt):

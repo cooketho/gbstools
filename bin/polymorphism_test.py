@@ -99,4 +99,7 @@ for snp in snps:
       print 'DP: %s' % str([call.DP for call in snp.calls])
       print 'PL: %s' % str([call.PL for call in snp.calls])
       print 'NF: %s' % str([call.NF for call in snp.calls])
+
    writer.write_record(snp)
+
+

@@ -212,7 +212,7 @@ class Reader():
                 call = alignment.pileup(chrom, pos, ref, alt[0])
                 # Look up the normalization factor based on insert size.
                 try:
-                    call.NF = self.normfactors[(sample, call.INS)]
+                    call.NF = self.normfactors[(sample, int(call.INS))]
                 except:
                     call.NF = 1.0
                 calls.append(call)
@@ -225,7 +225,7 @@ class Reader():
                     call = CallData(sample, **data)
                     if self.normfactors:
                         try:
-                            call.NF = self.normfactors[(sample, call.INS)]
+                            call.NF = self.normfactors[(sample, int(call.INS))]
                         except:
                             call.NF = 1.0
                     calls.append(call)
@@ -285,6 +285,12 @@ class Reader():
         return(marker)
 
     def fetch(self, chrom, start, end=None):
+        if end is None:
+            self.reader = self._reader.fetch(chrom, start, start + 1)
+            try:
+                return self.next()
+            except StopIteration:
+                return None
         self.reader = self._reader.fetch(chrom, start, end)
         return self
 
@@ -416,9 +422,9 @@ class Marker():
         
     def update_param(self, param):
         '''Update the parameter estimates by EM (see GBStools notes).'''
-        try:
+        if True:
             param_new = em.update(param[-1], self.calls, self.disp)
-        except:
+        else:
             param_new = param[-1].copy()
             param_new['fail'] = True
         return(param_new)
