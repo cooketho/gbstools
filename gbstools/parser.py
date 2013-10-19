@@ -407,16 +407,19 @@ class Marker():
                              'fail':fail, 
                              'loglik':None}]
 
-    def check_convergence(self, param, phi_tol=0.001, lamb_tol=0.1):
+    def check_convergence(self, param, phi_tol=0.001, lamb_tol=0.1, delta_tol=0.005):
         '''Check convergence of EM.'''
-        converged = False
         if param[-1]['fail']:
             converged = True
         elif len(param) > 1:
             phi_diff = (max(abs(param[-1]['phi'][1] - param[-2]['phi'][1]),
                             abs(param[-1]['phi'][2] - param[-2]['phi'][2])))
             lamb_diff = abs(param[-1]['lambda'] - param[-2]['lambda'])
-            if phi_diff <= phi_tol and lamb_diff <= lamb_tol:
+            delta_diff = abs(param[-1]['delta'] - param[-2]['delta'])
+
+            if phi_diff > phi_tol or lamb_diff > lamb_tol or delta_diff > delta_tol:
+                converged = False
+            else:
                 converged = True
         return(converged)
         
@@ -479,14 +482,16 @@ class PedMarker():
                                'fail':fail,
                                'loglik':None}]
 
-    def check_convergence(self, param, lamb_tol=0.25):
+    def check_convergence(self, param, lamb_tol=0.25, delta_tol=0.005):
         '''Check convergence of EM.'''
-        converged = False
         if param[-1]['fail']:
             converged = True
         elif len(param) > 1:
             lamb_diff = abs(param[-1]['lambda'] - param[-2]['lambda'])
-            if lamb_diff <= lamb_tol:
+            delta_diff = abs(param[-1]['delta'] - param[-2]['delta'])
+            if lamb_diff > lamb_tol or delta_diff > delta_tol:
+                converged = False
+            else:
                 converged = True
         return(converged)
 
