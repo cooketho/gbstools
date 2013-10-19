@@ -421,6 +421,8 @@ class Marker():
                 converged = False
             else:
                 converged = True
+        else:
+            converged = False
         return(converged)
         
     def update_param(self, param):
@@ -493,6 +495,8 @@ class PedMarker():
                 converged = False
             else:
                 converged = True
+        else:
+            converged = False
         return(converged)
 
     def update_param(self, param, parental_gt, lamb_tol=0.25):
