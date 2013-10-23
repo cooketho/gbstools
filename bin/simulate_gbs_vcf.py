@@ -25,7 +25,7 @@ parser.add_argument('--site_len', dest='site_len', type=int, default=6, help='re
 parser.add_argument('--read_len', dest='read_len', type=int, default=101, help='read length (default=101)')
 parser.add_argument('--seeds', dest='seeds', type=int, nargs=3, default=[0, 0, 0], help='ms seeds')
 parser.add_argument('--variants_only', dest='variants_only', action="store_true", help='output only variant sites')
-parser.add_argument('--missing', dest='missing', type=float, default=0.2, help='missingness threshold (default=0.2)')
+parser.add_argument('--missing', dest='missing', type=float, default=0.25, help='missingness threshold (default=0.25)')
 args = parser.parse_args()
 
 try:

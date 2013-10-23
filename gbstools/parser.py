@@ -36,8 +36,8 @@ INFO = (_Info('DLR', None, 'Float', 'Dropout likelihood ratio (GBStools)'),
         _Info('DigestH0', None, 'Float', 'Null hypothesis digest failure rate estimated by EM (GBStools)'),
         _Info('IterationH1', None, 'Integer', 'Number of null hypothesis EM iterations (GBStools)'),
         _Info('IterationH0', None, 'Integer', 'Number of alt hypothesis EM iterations (GBStools)'),
-        _Info('FailH1', None, 'Flag', 'EM failure flag'),
-        _Info('FailH0', None, 'Flag', 'Null hypothesis EM failure flag'),
+        _Info('EMFailH1', None, 'Flag', 'EM failure flag'),
+        _Info('EMFailH0', None, 'Flag', 'Null hypothesis EM failure flag'),
         _Info('SelfRS', None, 'String', 'Recognition sites for reads mapped to the SNP'),
         _Info('MateRS', None, 'String', 'Recognition sites for mate pairs of reads mapped to the SNP'),
         _Info('InsMed', None, 'Float', 'Insert size median'),
@@ -449,6 +449,8 @@ class Marker():
         self.info['DFreq'] = self.param['H1'][-1]['phi'][2]
         self.info['AFH1'] = self.param['H1'][-1]['phi'][1]
         self.info['AFH0'] = self.param['H0'][-1]['phi'][1]
+        self.info['LambdaH1'] = self.param['H1'][-1]['lambda']
+        self.info['LambdaH0'] = self.param['H0'][-1]['lambda']
         self.info['DigestH1'] = self.param['H1'][-1]['delta']
         self.info['DigestH0'] = self.param['H0'][-1]['delta']
         self.info['IterationH1'] = len(self.param['H1'])

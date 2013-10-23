@@ -19,8 +19,9 @@ dispersion=d. For calculating PL, the case call error rate is assumed to be
 
 parser = argparse.ArgumentParser(usage=USAGE, description=DESCRIPTION)
 parser.add_argument('-l', '--lambda', dest='lamb', type=float, help='mean depth of coverage', required=True)
-parser.add_argument('-d', '--dispersion', dest='d', type=float, default=2.5, help='index of dispersion (default=2.5)')
 parser.add_argument('-e', '--epsilon', dest='epsilon', type=float, default=0.001, help='base call error rate (default=0.001)')
+parser.add_argument('--dispersion_mean', dest='dmean', type=float, default=2.5, help='index of dispersion mean (default=2.5)')
+parser.add_argument('--dispersion_sd', dest='dsd', type=float, default=0, help='index of dispersion sd (default=0)')
 parser.add_argument('--seed', dest='seed', type=int, default=0, help='seed for random number generator')
 args = parser.parse_args()
 
@@ -44,13 +45,17 @@ def calculate_pl(dp_ref, dp_alt):
 
 
 rand = random.Random(0)
-d = args.d
 lamb = args.lamb
 for line in sys.stdin:
+    d = rand.normalvariate(mu=args.dmean, sigma=args.dsd)
+    if d < 1:
+        d = 1.001
     line = line.strip()
-    if line[0] == '#':
+    if line[:2] == '##':
         print line
         continue
+    elif line[:6] == '#CHROM':
+        print '##analysis=simulate_dp.py --lambda %f --epsilon %f --dispersion_mean %f --dispersion_sd %f --seed %s' % (args.lamb, args.epsilon, args.dmean, args.dsd, str(args.seed))
     fields = line.split()
     genotypes = fields[9:]
     samples = []
@@ -72,5 +77,6 @@ for line in sys.stdin:
             samples.append(sample)
         else:
             samples.append(gt)
-    output = fields[:8] + ['GT:AD:DP:PL'] + samples
+    info = '%s;Dispersion=%s' % (fields[7], '{0:.3f}'.format(d))
+    output = fields[:7] + [info] + ['GT:AD:DP:PL'] + samples
     print '\t'.join(output)
