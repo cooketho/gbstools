@@ -160,7 +160,7 @@ class Sample():
                         ac_sampled[i] += 2
                     elif loci[i] == (0, None) or loci[i] == (None, 0):
                         genotypes[i].append('0/.')
-                    elif loci[i] == (1, None) or loci[i] == (1, None):
+                    elif loci[i] == (1, None) or loci[i] == (None, 1):
                         genotypes[i].append('1/.')
                         ac_sampled[i] += 1
                     else:
