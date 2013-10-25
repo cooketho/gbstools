@@ -56,6 +56,8 @@ for line in sys.stdin:
         continue
     elif line[:6] == '#CHROM':
         print '##analysis=simulate_dp.py --lambda %f --epsilon %f --dispersion_mean %f --dispersion_sd %f --seed %s' % (args.lamb, args.epsilon, args.dmean, args.dsd, str(args.seed))
+        print line
+        continue
     fields = line.split()
     genotypes = fields[9:]
     samples = []

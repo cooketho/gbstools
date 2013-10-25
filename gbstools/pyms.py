@@ -162,23 +162,23 @@ class Sample():
                         genotypes[i].append('0/.')
                     elif loci[i] == (1, None) or loci[i] == (None, 1):
                         genotypes[i].append('1/.')
-                        ac_sampled[i] += 1
+                        ac_sampled[i] += 2
                     else:
                         genotypes[i].append('./.')
                         missing[i] += 1
                 
             # Determine the allelic background for the dropout allele.
-            dropout_alleles = zip(*dropout_haplotypes)    # Group alleles by locus.
+            dropout_alleles = zip(*dropout_haplotypes)    # Make list of tuples of alleles at each locus.
             if dropout_alleles:
                 background = []
                 for alleles in dropout_alleles:
                     if 0 in alleles:
                         if 1 in alleles:
-                            background.append('both')    # '-' is only seen with the derived allele.
+                            background.append('both')    # '-' is seen with both derived and ancestral alleles.
                         else:
                             background.append('ancestral')    # '-' is only seen with the ancestral allele.
                     else:
-                        background.append('derived')    # '-' is seen with both derived and ancestral alleles.
+                        background.append('derived')    # '-' is only seen with the derived allele.
             else:
                 background = [None] * len(indices)
 
