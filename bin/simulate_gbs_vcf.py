@@ -54,15 +54,12 @@ analysis = ("%s, "  % reader.command,
             "sampled_only=%r, " % args.sampled_only,
             "missing=%f" % args.missing)
 
-sitenum = 0
-snp = 0
 header = "##fileformat=VCFv4.1\n"
 header += "##analysis=" + '\t'.join(analysis) + "\n"
 header += "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t"
 header += '\t'.join([str(i) for i in range(n)]) + '\n'
 outstream.write(header)
 for site in reader:
-    sitenum += 1
     if site.ac and site.dcount < 2 * n:    # Ignore monomorphic sites.
         for i in range(len(site.ac)):
             # Ignore sites where ACgbs=0 if --sampled_only argument is used.
@@ -72,7 +69,6 @@ for site in reader:
             elif site.missing[i] > n * args.missing:
                 continue
             else:
-                snp += 1
                 # Get the genotypes sampled by GBS (may differ from true genotypes).
                 genotypes = site.genotypes[i]
                 # What SNP alleles is the `-` restriction site allele linked to?
@@ -93,9 +89,12 @@ for site in reader:
                 info = "DCount=%i;" % site.dcount
                 info += "AC=%i;" % site.ac[i]
                 info += "ACgbs=%i;" % site.ac_sampled[i]
+                info += "Hets=%i;" % site.hets[i]
+                info += "HetsGBS=%i;" % site.hets_sampled[i]
                 info += "Missing=%i;" % site.missing[i]
                 info += "Background=%s;" % background
                 info += "AncestralRS=%s" % ancestral_rs
-                fields = ['1', str(sitenum), str(snp)] + ['.'] * 4 + [info, 'GT'] + genotypes
+
+                fields = [str(site.sitenum), str(i)] + ['.'] * 5 + [info, 'GT'] + genotypes
                 output = '\t'.join(fields)
                 outstream.write(output + '\n')

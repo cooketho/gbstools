@@ -23,6 +23,7 @@ class Reader():
         self.variantsonly = variantsonly
         # Set the seed for the random number generator.
         self.rand = random.Random(0)
+        self.sitenum = 0
     
     def parse_header(self):
         '''Parse the header line of the MS output file.'''
@@ -44,6 +45,7 @@ class Reader():
     
     def next(self):
         '''Generate a "Sample" object that contains information from one MS site.'''
+        self.sitenum += 1
         segsites = None
         positions = []
         haplotypes = []
@@ -63,16 +65,16 @@ class Reader():
             else:
                 # Record the individual haplotypes.
                 haplotypes.append([int(i) for i in list(fields[0])])
-        if segsites != None:
+        if segsites is not None:
             # Create a "Sample" object.
-            return(Sample(segsites, positions, haplotypes, self.fraglen, 
-                          self.sitelen, self.readlen, self.variantsonly, self.rand))
+            return(Sample(segsites, positions, haplotypes, self.fraglen, self.sitelen,
+                          self.readlen, self.variantsonly, self.rand, self.sitenum))
         raise StopIteration
 
 class Sample():
     """Class for storing and manipulating data from one MS coalescent sample."""
     def __init__(self, segsites, positions, haplotypes, fraglen, sitelen, 
-                 readlen, variantsonly, rand):
+                 readlen, variantsonly, rand, sitenum):
         self.segsites = segsites
         self.positions = positions
         self.haplotypes = haplotypes
@@ -81,8 +83,10 @@ class Sample():
         self.readlen = readlen
         self.variantsonly = variantsonly
         self.rand = rand
+        self.sitenum = sitenum
         self.minus_haplotype = self.get_minus_haplotype()
-        self.dcount, self.missing, self.ac, self.ac_sampled, self.background, self.genotypes = self.counts()
+        (self.dcount, self.missing, self.ac, self.ac_sampled, self.hets, 
+         self.hets_sampled, self.background, self.genotypes) = self.counts()
         
     def get_minus_haplotype(self):
         '''Get list of SNP alleles that cause the '-' haplotype (0, 1, or None).'''
@@ -101,7 +105,8 @@ class Sample():
                     minus_haplotype.append(self.rand.choice((0,1)))
                 else:
                     # SNPs in interior of N bp fragment can also result in '-' haplotype.
-                    if self.rand.random() < 0.25 ** self.sitelen * 2:    # Approximate chance of seeing a restriction site at any given base.
+                    # Approximate chance of seeing a restriction site at any given base.
+                    if self.rand.random() < 0.25 ** self.sitelen * (self.sitelen * 2 - 1):
                         minus_haplotype.append(self.rand.choice((0,1)))
                     else:
                         minus_haplotype.append(None)
@@ -110,78 +115,85 @@ class Sample():
     def counts(self):
         '''Calculate DCount, Missing, AC, ACgbs, `-` background, GT list.'''
         n = len(self.haplotypes)
-        if self.segsites:    # Ignore sites where no SNP is segregating.
-            # Indices of alleles in the haplotype that are in the 2 x 101 bp region.
-            indices = []
-            for i in range(self.segsites):
-                # Forward read indices.
-                if (self.positions[i] > self.sitelen and 
-                    self.positions[i] <= self.sitelen + self.readlen):
-                    indices.append(i)
-                # Reverse read indices.
-                elif (self.positions[i] >= self.fraglen - (self.sitelen + self.readlen) and 
-                      self.positions < self.fraglen - self.sitelen):
-                    indices.append(i)
+        # Indices of alleles in the haplotype that are in the 2 x 101 bp region.
+        indices = []
+        for i in range(self.segsites):
+            # Forward read indices.
+            if (self.positions[i] > self.sitelen and 
+                self.positions[i] <= self.sitelen + self.readlen):
+                indices.append(i)
+            # Reverse read indices.
+            elif (self.positions[i] >= self.fraglen - (self.sitelen + self.readlen) and 
+                  self.positions < self.fraglen - self.sitelen):
+                indices.append(i)
 
-            # Get haplotypes.
-            haplotypes = []
-            sequenced_haplotypes = []
-            dropout_haplotypes = []
-            dcount = 0
-            for hap in self.haplotypes:
-                haplotypes.append([hap[i] for i in indices])
-                if sum([a == b for a, b in zip(hap, self.minus_haplotype)]) == 0:
-                    sequenced_haplotypes.append([hap[i] for i in indices])
-                else:
-                    sequenced_haplotypes.append([None] * len(indices))
-                    dropout_haplotypes.append([hap[i] for i in indices])
-                    dcount += 1
-
-            # Get true allele counts.
-            ac = [sum(i) for i in zip(*haplotypes)]
-                    
-            # Get sequenced genotypes.
-            genotypes = [[] for i in range(len(ac))]
-            ac_sampled = [0] * len(ac)
-            missing = [0] * len(ac)
-
-            # Iterate through pairs of samples (a, b).
-            hap_pairs = zip(sequenced_haplotypes[0::2], sequenced_haplotypes[1::2])
-            for hap_pair in hap_pairs:
-                loci = zip(*hap_pair)
-                for i in range(len(loci)):    # Iterate over loci and get genotypes.
-                    if loci[i] == (0, 0):
-                        genotypes[i].append('0/0')
-                    elif loci[i] == (0, 1) or loci[i] == (1, 0):
-                        genotypes[i].append('0/1')
-                        ac_sampled[i] += 1
-                    elif loci[i] == (1, 1):
-                        genotypes[i].append('1/1')
-                        ac_sampled[i] += 2
-                    elif loci[i] == (0, None) or loci[i] == (None, 0):
-                        genotypes[i].append('0/.')
-                    elif loci[i] == (1, None) or loci[i] == (None, 1):
-                        genotypes[i].append('1/.')
-                        ac_sampled[i] += 2
-                    else:
-                        genotypes[i].append('./.')
-                        missing[i] += 1
-                
-            # Determine the allelic background for the dropout allele.
-            dropout_alleles = zip(*dropout_haplotypes)    # Make list of tuples of alleles at each locus.
-            if dropout_alleles:
-                background = []
-                for alleles in dropout_alleles:
-                    if 0 in alleles:
-                        if 1 in alleles:
-                            background.append('both')    # '-' is seen with both derived and ancestral alleles.
-                        else:
-                            background.append('ancestral')    # '-' is only seen with the ancestral allele.
-                    else:
-                        background.append('derived')    # '-' is only seen with the derived allele.
+        # Get haplotypes.
+        haplotypes = []
+        sequenced_haplotypes = []
+        dropout_haplotypes = []
+        dcount = 0
+        for hap in self.haplotypes:
+            haplotypes.append([hap[i] for i in indices])
+            if sum([a == b for a, b in zip(hap, self.minus_haplotype)]) == 0:
+                sequenced_haplotypes.append([hap[i] for i in indices])
             else:
-                background = [None] * len(indices)
+                sequenced_haplotypes.append([None] * len(indices))
+                dropout_haplotypes.append([hap[i] for i in indices])
+                dcount += 1
 
-            return((dcount, missing, ac, ac_sampled, background, genotypes))
+        # Get true allele counts.
+        ac = [sum(i) for i in zip(*haplotypes)]
+                    
+        # Initialize lists of sequenced genotypes, sampled AC, and sampled hets.
+        genotypes = [[] for i in range(len(ac))]
+        ac_sampled = [0] * len(ac)
+        missing = [0] * len(ac)
+
+        # Iterate through pairs of samples (a, b).
+        hap_pairs = zip(sequenced_haplotypes[0::2], sequenced_haplotypes[1::2])
+        for hap_pair in hap_pairs:
+            loci = zip(*hap_pair)
+            for i in range(len(loci)):    # Iterate over loci and get genotypes.
+                if loci[i] == (0, 0):
+                    genotypes[i].append('0/0')
+                elif loci[i] == (0, 1) or loci[i] == (1, 0):
+                    genotypes[i].append('0/1')
+                    ac_sampled[i] += 1
+                elif loci[i] == (1, 1):
+                    genotypes[i].append('1/1')
+                    ac_sampled[i] += 2
+                elif loci[i] == (0, None) or loci[i] == (None, 0):
+                    genotypes[i].append('0/.')
+                elif loci[i] == (1, None) or loci[i] == (None, 1):
+                    genotypes[i].append('1/.')
+                    ac_sampled[i] += 2
+                else:
+                    genotypes[i].append('./.')
+                    missing[i] += 1
+
+        # Calculate number of hets.
+        hets = [0] * len(ac)
+        true_hap_pairs = zip(haplotypes[0::2], haplotypes[1::2])
+        for hap_pair in true_hap_pairs:
+            loci = zip(*hap_pair)
+            for i in range(len(loci)):
+                if loci[i] == (0, 1) or loci[i] == (1, 0):
+                    hets[i] += 1
+        hets_sampled = [geno.count('0/1') for geno in genotypes]
+
+        # Determine the allelic background for the dropout allele.
+        dropout_alleles = zip(*dropout_haplotypes)    # Make list of tuples of alleles at each locus.
+        if dropout_alleles:
+            background = []
+            for alleles in dropout_alleles:
+                if 0 in alleles:
+                    if 1 in alleles:
+                        background.append('both')    # '-' is seen with both derived and ancestral alleles.
+                    else:
+                        background.append('ancestral')    # '-' is only seen with the ancestral allele.
+                else:
+                    background.append('derived')    # '-' is only seen with the derived allele.
         else:
-            return((None, None, None, None, None, []))
+            background = [None] * len(indices)
+
+        return((dcount, missing, ac, ac_sampled, hets, hets_sampled, background, genotypes))
