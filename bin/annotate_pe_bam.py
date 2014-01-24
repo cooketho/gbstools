@@ -44,10 +44,8 @@ def update_tags(stack_read, reads):
             stack_read.tags.append(('Z0', int(insert)))
         except:
             pass
-        try:
+        if mate.enzyme_tag:
             stack_read.tags.append(('Z4', mate.enzyme_tag))
-        except:
-            pass
     except:
         pass
     return(None)
