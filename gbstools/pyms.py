@@ -8,7 +8,7 @@ import random
 
 class Reader():
     """Parser class for MS output files. Generates ``Sample`` objects."""
-    def __init__(self, msfile, fraglen=500, sitelen=6, readlen=101, variantsonly=False):
+    def __init__(self, msfile, fraglen=500, sitelen=6, siteprob=0.0011, readlen=101, variantsonly=False):
         self.msfile = msfile
         self.samples = None
         self.seeds = None
@@ -18,6 +18,7 @@ class Reader():
         self.fraglen = fraglen
         # Length of restriction site.
         self.sitelen = sitelen
+        self.siteprob = siteprob
         self.readlen = readlen
         # Flag=true when each site has a segregating restriction site variant.
         self.variantsonly = variantsonly
@@ -67,19 +68,20 @@ class Reader():
                 haplotypes.append([int(i) for i in list(fields[0])])
         if segsites is not None:
             # Create a "Sample" object.
-            return(Sample(segsites, positions, haplotypes, self.fraglen, self.sitelen,
+            return(Sample(segsites, positions, haplotypes, self.fraglen, self.sitelen, self.siteprob,
                           self.readlen, self.variantsonly, self.rand, self.sitenum))
         raise StopIteration
 
 class Sample():
     """Class for storing and manipulating data from one MS coalescent sample."""
-    def __init__(self, segsites, positions, haplotypes, fraglen, sitelen, 
+    def __init__(self, segsites, positions, haplotypes, fraglen, sitelen, siteprob,
                  readlen, variantsonly, rand, sitenum):
         self.segsites = segsites
         self.positions = positions
         self.haplotypes = haplotypes
         self.fraglen = fraglen    # Number of samples.
         self.sitelen = sitelen    # Length of restriction site.
+        self.siteprob = siteprob    # Per-base probability of seeing a restriction site.
         self.readlen = readlen
         self.variantsonly = variantsonly
         self.rand = rand
@@ -105,8 +107,8 @@ class Sample():
                     minus_haplotype.append(self.rand.choice((0,1)))
                 else:
                     # SNPs in interior of N bp fragment can also result in '-' haplotype.
-                    # Approximate chance of seeing a restriction site at any given base.
-                    if self.rand.random() < 0.25 ** self.sitelen * (self.sitelen * 2 - 1):
+                    # Approximate chance of seeing a restriction site at any given base (for non-palindromic sites).
+                    if self.rand.random() < self.siteprob:
                         minus_haplotype.append(self.rand.choice((0,1)))
                     else:
                         minus_haplotype.append(None)

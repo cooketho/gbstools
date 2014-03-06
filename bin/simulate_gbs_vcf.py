@@ -22,6 +22,7 @@ parser.add_argument('-t', '--theta', dest='t', type=float, help='scaled mutation
 parser.add_argument('-i', '--input', dest='input', default=None, help='ms results file to use as input')
 parser.add_argument('--frag_len', dest='frag_len', type=int, default=500, help='mean digest fragment length (default=500)')
 parser.add_argument('--site_len', dest='site_len', type=int, default=6, help='recognition site length (default=6)')
+parser.add_argument('--site_prob', dest='site_prob', type=float, default=0.0011, help='per-bp probability of recognition site')
 parser.add_argument('--read_len', dest='read_len', type=int, default=101, help='read length (default=101)')
 parser.add_argument('--seeds', dest='seeds', type=int, nargs=3, default=[0, 0, 0], help='ms seeds')
 parser.add_argument('--variants_only', dest='variants_only', action="store_true", help='output only variant sites')
@@ -40,8 +41,9 @@ except:
 
 outstream = sys.stdout
 
-reader = pyms.Reader(instream, fraglen=args.frag_len, sitelen=args.site_len, 
-                     readlen=args.read_len, variantsonly=args.variants_only)
+reader = pyms.Reader(instream, fraglen=args.frag_len, sitelen=args.site_len,
+                     siteprob=args.site_prob, readlen=args.read_len, 
+                     variantsonly=args.variants_only)
 n = reader.samples / 2
 
 analysis = ("%s, "  % reader.command,
@@ -49,6 +51,7 @@ analysis = ("%s, "  % reader.command,
             "fraglen=%i, " % args.frag_len,
             "readlen=%i, " % args.read_len,
             "sitelen=%i, " % args.site_len,
+            "siteprob=%f, " % args.site_prob,
             "seeds=%s, " % args.seeds,
             "variants_only=%r, " % args.variants_only,
             "sampled_only=%r, " % args.sampled_only,

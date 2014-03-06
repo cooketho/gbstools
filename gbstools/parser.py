@@ -75,7 +75,7 @@ GT_FORMATTED = {(2,0,0):'0/0',
 
 class Reader():
     """Reader for a VCF file, an iterator returning ``_Marker`` objects."""
-    def __init__(self, filename, bamlist=None, norm=None, disp_intercept=2.5, 
+    def __init__(self, filename, bamlist=None, norm=None, disp_intercept=2.5,
                  disp_slope=0.0, ped=None, samples=None, dpmode=False):
                  
         """Create a new Reader for a VCF file containing GBS data.
@@ -108,6 +108,7 @@ class Reader():
             self.normfactors = self.parse_norm(norm)
         except:
             self.normfactors = None
+
         self.disp = {'slope':disp_slope, 'intercept':disp_intercept}
         # Should DP-only mode be used?
         self.dpmode = dpmode
@@ -201,8 +202,6 @@ class Reader():
         pos = vcf_record.POS - 1
         ref = vcf_record.REF
         alt = vcf_record.ALT
-        # Make a dict of PyVCF ``_Call`` objects keyed by sample name.
-        vcf_calls = dict(zip(self._reader.samples, vcf_record.samples))
         # Generate a list of ''CallData'' objects in the same order as in vcf.
         calls = []
         for sample in self.samples:
@@ -210,29 +209,25 @@ class Reader():
                 # Get read data directly from bam file.
                 alignment = self.alignments[sample]
                 call = alignment.pileup(chrom, pos, ref, alt[0])
-                # Look up the normalization factor based on insert size.
-                try:
-                    call.NF = self.normfactors[(sample, int(call.INS))]
-                except:
-                    call.NF = 1.0
-                calls.append(call)
             except:
                 try:
+                    # Make a dict of PyVCF ``_Call`` objects keyed by sample name.
+                    vcf_calls = dict(zip(self._reader.samples, vcf_record.samples))
                     # Get read data from VCF.
                     keys = vcf_calls[sample].data._fields
                     vals = list(iter(vcf_calls[sample].data))
                     data = dict(zip(keys, vals))
                     call = CallData(sample, **data)
-                    if self.normfactors:
-                        try:
-                            call.NF = self.normfactors[(sample, int(call.INS))]
-                        except:
-                            call.NF = 1.0
-                    calls.append(call)
                 except:
                     message = ("Sample ''%s'' not found in user-supplied VCF "
                                "or in user-supplied list of bam files." % sample)
                     raise Exception(message)
+            # Look up the normalization factor based on insert size.            
+            try:
+                call.NF = self.normfactors[(sample, int(call.INS))]
+            except:
+                call.NF = 1.0
+            calls.append(call)
                 
         # If DP-only mode is being used, set PL to None.
         if self.dpmode:
@@ -276,6 +271,7 @@ class Reader():
             info['MateRS'] = "%s,%i" % (mate_rs, count)
         except:
             pass
+
         # Generate ''Marker'' or ''PedMarker'' object.
         if not self.family:
             marker = Marker(rec=vcf_record, calls=calls, disp=self.disp, info=info)
@@ -337,6 +333,8 @@ class Writer():
             marker.record.add_format('NF')
         if 'INS' not in marker.record.FORMAT:
             marker.record.add_format('INS')
+        if 'DC' not in marker.record.FORMAT:
+            marker.record.add_format('DC')
         # Update the vcf sample data.
         for sample in marker.record.samples:
             ids = list(sample.data._fields)
@@ -351,6 +349,13 @@ class Writer():
                 ids.append('INS')
                 try:
                     vals.append(int(ins[sample.sample]))
+                except:
+                    vals.append(None)
+            if 'DC' not in ids:
+                ids.append('DC')
+                try:
+                    dropout_count = marker.param['H1'][-1]['exp_phi'][sample.sample][2]
+                    vals.append(round(dropout_count, 3))
                 except:
                     vals.append(None)
             new_cls = make_calldata_tuple(ids)
@@ -368,9 +373,9 @@ class Marker():
         self.info = info
         self.param = {}
         self.lik_ratio = None
-        # Initial dropout frequency.
+        # Initial dropout frequency.                                                                                                                                                                                                                                                                             
         dfreq = 0.01
-        # Bool indicating allele data is missing.
+        # Bool indicating allele data is missing.                                                                                                                                                                                                                                                                
         dp_mode = not bool([call.PL for call in calls if call.PL])
         if dp_mode:
             phi0 = [1 - dfreq, 0, dfreq]
@@ -394,18 +399,22 @@ class Marker():
             self.disp = None
             delta0 = None
             fail = True
-        # Alternative hypothesis initial parameters.
-        self.param['H1'] = [{'phi':phi0, 
+        # Alternative hypothesis initial parameters.                                                                                                                                                                                                                                                             
+        self.param['H1'] = [{'phi':phi0,
                              'lambda':lambda0,
                              'delta':delta0,
                              'fail':fail,
-                             'loglik':None}]
-        # Null hypothesis initial parameters.
-        self.param['H0'] = [{'phi':phi0_null, 
+                             'loglik':None,
+                             'exp_phi':None,
+                             'exp_delta':None}]
+        # Null hypothesis initial parameters.                                                                                                                                                                                                                                                                    
+        self.param['H0'] = [{'phi':phi0_null,
                              'lambda':lambda0,
                              'delta':delta0,
-                             'fail':fail, 
-                             'loglik':None}]
+                             'fail':fail,
+                             'loglik':None,
+                             'exp_phi':None,
+                             'exp_delta':None}]
 
     def check_convergence(self, param, phi_tol=0.001, lamb_tol=0.1, delta_tol=0.005):
         '''Check convergence of EM.'''
@@ -458,7 +467,7 @@ class Marker():
         self.info['EMFailH1'] = self.param['H1'][-1]['fail']
         self.info['EMFailH0'] = self.param['H0'][-1]['fail']
         return(None)
-
+    
 class PedMarker():
     """Store data from a single pedigree GBS SNP marker and call EM functions."""
     def __init__(self, rec, calls, disp, info, family):
@@ -473,27 +482,23 @@ class PedMarker():
         if dp > 0:
             lambda0 = float(dp) / (len(calls) - missing)
             self.disp = disp['slope'] * lambda0 + disp['intercept']
-            delta0 = max(float(missing) / len(calls), 0.01)
             fail = False
         else:
             lambda0 = None
             self.disp = None
-            delta0 = None
             fail = True
         for gt in em.trio_gt:
             self.param[gt] = [{'lambda':lambda0,
-                               'delta':delta0,
                                'fail':fail,
                                'loglik':None}]
 
-    def check_convergence(self, param, lamb_tol=0.25, delta_tol=0.005):
+    def check_convergence(self, param, lamb_tol=0.25):
         '''Check convergence of EM.'''
         if param[-1]['fail']:
             converged = True
         elif len(param) > 1:
             lamb_diff = abs(param[-1]['lambda'] - param[-2]['lambda'])
-            delta_diff = abs(param[-1]['delta'] - param[-2]['delta'])
-            if lamb_diff > lamb_tol or delta_diff > delta_tol:
+            if lamb_diff > lamb_tol:
                 converged = False
             else:
                 converged = True
@@ -548,8 +553,6 @@ class PedMarker():
         self.info['ParentsH0'] = "%s,%s" % parentsH0
         self.info['LambdaH1'] = self.param[gtH1][-1]['lambda']
         self.info['LambdaH0'] = self.param[gtH0][-1]['lambda']
-        self.info['DigestH1'] = self.param[gtH1][-1]['delta']
-        self.info['DigestH0'] = self.param[gtH0][-1]['delta']
         self.info['IterationH1'] = len(self.param[gtH1])
         self.info['IterationH0'] = len(self.param[gtH0])
         self.info['EMFailH1'] = self.param[gtH1][-1]['fail']

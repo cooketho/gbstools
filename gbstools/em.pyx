@@ -3,6 +3,8 @@ cdef extern from "math.h":
     double exp (double x)
 
 from scipy.misc import comb
+#from math import log
+#from math import exp
 from collections import namedtuple
 
 # Defined as ('A' count, 'a', count, '-' count) (see GBStools notes).
@@ -67,13 +69,16 @@ def update(param, calls, disp):
     n = len(calls)    # Number of samples.
     # Initialize counter variables for phi, delta, lambda, loglik.
     phi = [0, 0, 0]
-    delta = 0
     lamb_numer = 0
     lamb_denom = 0
     loglik = 0
+    exp_phi = {}
+    exp_delta = {}
     for call in calls:
         sample_lik = {}
         sample_psi = {}
+        exp_phi[call.sample] = [0, 0, 0]
+        exp_delta[call.sample] = 0
         for z in (0, 1):
             for g in GENO:
                 m = (2.0 - g[2])    # Apparent ploidy, given g.
@@ -95,21 +100,29 @@ def update(param, calls, disp):
             phi[0] += g[0] * normlik / (2 * n * liksum)
             phi[1] += g[1] * normlik / (2 * n * liksum)
             phi[2] += g[2] * normlik / (2 * n * liksum)
-            delta += (1 - z) * normlik / (n * liksum)
+            delta += (1 - z) * normlik  / (n * liksum)
             lamb_numer += (lambda_numer(g, z, call.DP, call.NF, param['lambda'], psi) *
                            normlik / liksum)
             lamb_denom += (lambda_denom(g, z, call.DP, call.NF, param['lambda'], psi) *
                            normlik / liksum)
+            exp_phi[call.sample][0] += g[0] * normlik / liksum
+            exp_phi[call.sample][1] += g[1] * normlik / liksum
+            exp_phi[call.sample][2] += g[2] * normlik / liksum
+            exp_delta[call.sample] += (1 - z) * normlik / liksum
         try:
             loglik += log(sum([exp(l) for l in sample_lik.values()]))
         except:
             loglik = None
     lamb = param['lambda'] - lamb_numer / lamb_denom
+    if lamb < 0:
+        lamb = min(1.0, param['lambda'] / 2)
     param_update = {'phi':phi, 
-                    'delta':delta, 
+                    'delta':delta,
                     'lambda':lamb, 
                     'fail':param['fail'], 
-                    'loglik':loglik}
+                    'loglik':loglik,
+                    'exp_phi':exp_phi,
+                    'exp_delta':exp_delta}
     return(param_update)
 
 

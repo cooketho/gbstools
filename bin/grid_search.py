@@ -3,6 +3,7 @@ import re
 import sys
 import argparse
 import gbstools
+import copy
 
 # Parse command line arguments from user.
 USAGE = """
@@ -30,6 +31,12 @@ parser.add_argument('--dpmode',dest='dpmode', action="store_true", help='use DP 
 parser.add_argument('--ped',dest='ped', default=None, help='PED file for nuclear family (when specified, pedigree-mode is used)')
 parser.add_argument('--intervals',dest='intervals', default=None, type=str, help='samtools-style intervals (e.g. chr1:1-1000)')
 parser.add_argument('--debug',dest='debug', action='store_true', help='use debug mode')
+parser.add_argument('--lambdamin',dest='lambdamin', default=0, type=float)
+parser.add_argument('--lambdamax',dest='lambdamax', default=220, type=float)
+parser.add_argument('--lambdagrid',dest='lambdagrid', default=20, type=int)
+parser.add_argument('--phimin',dest='phimin', default=0, type=float)
+parser.add_argument('--phimax',dest='phimax', default=1.0, type=float)
+parser.add_argument('--phigrid',dest='phigrid', default=20, type=int)
 args = parser.parse_args()
 
 if args.o:
@@ -37,11 +44,11 @@ if args.o:
 else:
    outstream = sys.stdout
 
-reader = gbstools.Reader(filename=args.i, bamlist=args.bamlist, norm=args.nf,
+reader = gbstools.Reader(filename=args.i, bamlist=args.bamlist, norm=args.nf, 
                          disp_slope=args.disp_slope, disp_intercept=args.disp_intercept,
                          ped=args.ped, samples=args.samples, dpmode=args.dpmode)
                          
-writer = gbstools.Writer(outstream, template=reader)
+#writer = gbstools.Writer(outstream, template=reader)
 
 try:
    intervals = re.split('[:-]', args.intervals)
@@ -58,6 +65,12 @@ try:
 except:
    snps = (snp for snp in reader)
 
+# Print header.
+header = ['CHROM', 'POS', 'lambda']
+header += [str(args.phimin + i * (args.phimax - args.phimin) / args.phigrid) for i in range(args.phigrid + 1)]
+header += ['lambda_em', 'phi3_em', 'loglik_em']
+print '\t'.join(header)
+
 for snp in snps:
    if not reader.family:
       while not snp.check_convergence(snp.param['H1']):
@@ -68,6 +81,28 @@ for snp in snps:
       param = snp.update_param(snp.param['H1'])
       snp.param['H1'][-1]['loglik'] = param['loglik']
 
+      # Do the grid search.
+      if not snp.param['H1'][-1]['fail']:
+         for lamb in [args.lambdamin + i * (args.lambdamax - args.lambdamin) / args.lambdagrid for i in range(args.lambdagrid + 1)]:
+            output = [snp.record.CHROM, snp.record.POS, lamb]
+            for phi3 in [args.phimin + i * (args.phimax - args.phimin) / args.phigrid for i in range(args.phigrid + 1)]:
+               # Start with the last parameter estimates from EM.
+               param = copy.deepcopy(snp.param['H1'][-1])
+               # Re-set the lambda and phi3 parameters to the grid parameters.
+               param['lambda'] = lamb
+               param['phi'][2] = phi3
+               # Subtract phi3 from phi1 or phi2, whichever is larger.
+               if param['phi'][0] > param['phi'][1]:
+                  param['phi'][0] -= phi3
+               else:
+                  param['phi'][1] -=  phi3  
+               # Calculate log likelihood (with update function).
+               param_updated = snp.update_param([param])
+               # Add loglik to grid.
+               output.append(param_updated['loglik'])
+            output += [snp.param['H1'][-1]['lambda'], snp.param['H1'][-1]['phi'][2], snp.param['H1'][-1]['loglik']]
+            print '\t'.join([str(i) for i in output])
+            
       while not snp.check_convergence(snp.param['H0']):
          param = snp.update_param(snp.param['H0'])
          snp.param['H0'].append(param)
@@ -90,17 +125,16 @@ for snp in snps:
    snp.update_info()
 
    if args.debug:
-      keys = ('phi', 'lambda', 'fail', 'loglik')
       print 'H0:'
       for param in snp.param['H0']:
-         print 'phi: %s\tlambda: %s\tfail: %s\tloglik: %s' % (str(param['phi']), str(param['lambda']), str(param['fail']), str(param['loglik']))
+         print param
       print 'H1:'
       for param in snp.param['H1']:
-         print 'phi: %s\tlambda: %s\tfail: %s\tloglik: %s' % (str(param['phi']), str(param['lambda']), str(param['fail']), str(param['loglik']))
+         print param
       print 'DP: %s' % str([call.DP for call in snp.calls])
       print 'PL: %s' % str([call.PL for call in snp.calls])
       print 'NF: %s' % str([call.NF for call in snp.calls])
 
-   writer.write_record(snp)
+#   writer.write_record(snp)
 
 
