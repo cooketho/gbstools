@@ -60,14 +60,6 @@ except:
 
 for snp in snps:
    if not reader.family:
-      while not snp.check_convergence(snp.param['H1']):
-         param = snp.update_param(snp.param['H1'])
-         snp.param['H1'].append(param)
-         if len(snp.param['H1']) > 30:
-            snp.param['H1'][-1]['fail'] = True
-      param = snp.update_param(snp.param['H1'])
-      snp.param['H1'][-1]['loglik'] = param['loglik']
-
       while not snp.check_convergence(snp.param['H0']):
          param = snp.update_param(snp.param['H0'])
          snp.param['H0'].append(param)
@@ -75,6 +67,17 @@ for snp in snps:
             snp.param['H0'][-1]['fail'] = True
       param = snp.update_param(snp.param['H0'])
       snp.param['H0'][-1]['loglik'] = param['loglik']
+
+      while not snp.check_convergence(snp.param['H1']):
+         param = snp.update_param(snp.param['H1'])
+         snp.param['H1'].append(param)
+         if len(snp.param['H1']) > 30:
+            snp.param['H1'][-1]['fail'] = True
+      param = snp.update_param(snp.param['H1'])
+      snp.param['H1'][-1]['loglik'] = param['loglik']
+      # If the null hypothesis has a higher loglik, use it instead.
+      if snp.param['H1'][-1]['loglik'] < snp.param['H0'][-1]['loglik']:
+         snp.param['H1'].append(snp.param['H0'][-1])
 
    else:
       for gt in snp.param:

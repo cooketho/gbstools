@@ -69,6 +69,7 @@ def update(param, calls, disp):
     n = len(calls)    # Number of samples.
     # Initialize counter variables for phi, delta, lambda, loglik.
     phi = [0, 0, 0]
+    delta = 0
     lamb_numer = 0
     lamb_denom = 0
     loglik = 0
