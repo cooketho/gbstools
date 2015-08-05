@@ -53,7 +53,7 @@ tabix -p bed sim.digest.gbsbed.gz
 
 for i in {0..9};do
 samtools index ${i}.bam
-annotate_se_bam.py -i ${i}.bam -o ${i}.annotated.bam -r sim.digest.gbsbed.gz
+annotate_se_bam.py -i ${i}.bam -o ${i}.annotated.bam -b sim.digest.gbsbed.gz
 samtools index ${i}.annotated.bam
 done
 

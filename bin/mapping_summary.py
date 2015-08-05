@@ -23,7 +23,7 @@ read_counts = {0:{0:0, 1:0, 2:0},
                1:{0:0, 1:0, 2:0},
                2:{0:0, 1:0, 2:0}}
 
-print "# file: %s" % options.i
+print "# file: %s" % args.i
 print "#"
 for read in bam:
     tags = dict(read.tags)

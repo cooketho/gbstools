@@ -65,9 +65,9 @@ def fetch_sites(chrom, bed):
 
 
 # Bed file of restriction sites, indexed by tabix.
-restrictbed = pysam.Tabixfile(options.b, 'r')
-inbam = pysam.Samfile(options.i, 'rb')
-outbam = pysam.Samfile(options.o, 'wb', template=inbam)
+restrictbed = pysam.Tabixfile(args.b, 'r')
+inbam = pysam.Samfile(args.i, 'rb')
+outbam = pysam.Samfile(args.o, 'wb', template=inbam)
 # Each read is queried against a hash of restriction sites.
 restrict = {}
 # Read counter.

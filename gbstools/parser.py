@@ -75,7 +75,7 @@ GT_FORMATTED = {(2,0,0):'0/0',
 
 class Reader():
     """Reader for a VCF file, an iterator returning ``_Marker`` objects."""
-    def __init__(self, filename, bamlist=None, norm=None, disp_intercept=2.5,
+    def __init__(self, filename=None, bamlist=None, norm=None, disp_intercept=2.5, 
                  disp_slope=0.0, ped=None, samples=None, dpmode=False):
                  
         """Create a new Reader for a VCF file containing GBS data.
@@ -442,6 +442,18 @@ class Marker():
             param_new = param[-1].copy()
             param_new['fail'] = True
         return(param_new)
+
+    def print_param(self, param_dict):
+        '''Print out parameter estimates in a easy-to-read format'''
+        try:
+            print 'Frequency estimates (phi parameter) for alleles REF, ALT and `-` (non-cut allele masking REF or ALT): %s' % str(param_dict['phi'])
+            print 'Coverage parameter (lambda) estimate: %f' % param_dict['lambda']
+            print 'Digest failure parameter (delta) estimate: %f' % param_dict['delta']
+            print 'Log-likelihood: %f' % param_dict['loglik']
+            print 'EM failed: %s' % param_dict['fail']
+        except:
+            print 'Error parsing parameters'
+        return(None)
 
     def likelihood_ratio(self):
         '''Null hypothesis: phi[2] == 0. Alt hypothesis: phi[2] > 0.'''

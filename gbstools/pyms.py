@@ -88,7 +88,8 @@ class Sample():
         self.sitenum = sitenum
         self.minus_haplotype = self.get_minus_haplotype()
         (self.dcount, self.missing, self.ac, self.ac_sampled, self.hets, 
-         self.hets_sampled, self.background, self.genotypes) = self.counts()
+         self.hets_sampled, self.background, self.genotypes, self.true_genotypes,
+         self.hets_missing) = self.counts()
         
     def get_minus_haplotype(self):
         '''Get list of SNP alleles that cause the '-' haplotype (0, 1, or None).'''
@@ -172,16 +173,30 @@ class Sample():
                 else:
                     genotypes[i].append('./.')
                     missing[i] += 1
+        # Calculate number of observed hets.
+        hets_sampled = [geno.count('0/1') for geno in genotypes]
 
-        # Calculate number of hets.
+        # Determine true genotypes and calculate true number of hets.
         hets = [0] * len(ac)
         true_hap_pairs = zip(haplotypes[0::2], haplotypes[1::2])
+        true_genotypes = [[] for i in range(len(ac))]
         for hap_pair in true_hap_pairs:
             loci = zip(*hap_pair)
-            for i in range(len(loci)):
-                if loci[i] == (0, 1) or loci[i] == (1, 0):
+            for i in range(len(loci)):    # Iterate over loci and get genotypes.
+                if loci[i] == (0, 0):
+                    true_genotypes[i].append('0/0')
+                elif loci[i] == (0, 1) or loci[i] == (1, 0):
                     hets[i] += 1
-        hets_sampled = [geno.count('0/1') for geno in genotypes]
+                    true_genotypes[i].append('0/1')
+                elif loci[i] == (1, 1):
+                    true_genotypes[i].append('1/1')
+
+        # Calculate number of hets with './.' observed (missing) genotype.
+        hets_missing = [0] * len(ac)
+        for i in range(len(true_genotypes)):
+            for j in range(len(true_genotypes[i])):
+                if true_genotypes[i][j] == '0/1' and genotypes[i][j] == './.':
+                    hets_missing[i] += 1
 
         # Determine the allelic background for the dropout allele.
         dropout_alleles = zip(*dropout_haplotypes)    # Make list of tuples of alleles at each locus.
@@ -198,4 +213,4 @@ class Sample():
         else:
             background = [None] * len(indices)
 
-        return((dcount, missing, ac, ac_sampled, hets, hets_sampled, background, genotypes))
+        return((dcount, missing, ac, ac_sampled, hets, hets_sampled, background, genotypes, true_genotypes, hets_missing))
