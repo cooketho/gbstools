@@ -61,6 +61,7 @@ scripts = ['bin/annotate_pe_bam.py',
            'bin/simulate_fastq.py',
            'bin/simulate_gbs_vcf.py',
            'bin/simulate_ped_vcf.py',
+           'bin/extract_vcf_info.py',
            'bin/rs_dp.py']
 
 setup(

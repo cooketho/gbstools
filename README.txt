@@ -13,8 +13,6 @@ pysam
 
 Installation
 ============
-tar -xvzf GBStools-X.X.X.tar.gz
-cd gbstools
 python setup.py build
 python setup.py install
 
@@ -41,8 +39,9 @@ Next, you can calculate maximum likelihood estimates of the frequency of the
 non-cutter restriction site allele by expectation-maximization (EM)::
 
        >>> while not snp.check_convergence(snp.param['H1']):
-       >>>     updated_param = snp.update_param(snp.param['H1'])
-       >>>     snp.param['H1'].append(updated_param)
+       ...     updated_param = snp.update_param(snp.param['H1'])
+       ...     snp.param['H1'].append(updated_param)
+       ...
        >>> snp.print_param(snp.param['H1'][-1])
        Frequency estimates (phi parameter) for alleles REF, ALT and `-` (non-cut allele masking REF or ALT): [0.9497839580787633, 0.05000000004538233, 0.00021604187585445075]
        Coverage parameter (lambda) estimate: 40.008624
@@ -64,8 +63,9 @@ You can estimate the null-hypothesis parameters the same way (This time the
 non-cutter allele is restricted to frequency 0).
 
        >>> while not snp.check_convergence(snp.param['H0']):
-       >>>     updated_param = snp.update_param(snp.param['H0'])
-       >>>     snp.param['H0'].append(updated_param)
+       ...     updated_param = snp.update_param(snp.param['H0'])
+       ...     snp.param['H0'].append(updated_param)
+       ...
        >>> snp.print_param(snp.param['H0'][-1])
 Frequency estimates (phi parameter) for alleles REF, ALT and `-` (non-cut allele masking REF or ALT): [0.9499999999545502, 0.0500000000454499, 0.0]
 Coverage parameter (lambda) estimate: 40.000000
@@ -83,10 +83,12 @@ If you want to create a new vcf that contains the likelihood ratio and other dat
 in the INFO field, first create a ``Writer`` object. GBStools will copy header 
 data from a template vcf (in this case copied from the ``Reader`` object)::
 
-       >>> writer = gbstools.Writer(open('test.vcf', 'w'), template=reader)
+       >>> outputVcf = open('sim.scored.vcf', 'w')
+       >>> writer = gbstools.Writer(outputVcf, template=reader)
        >>> snp.lik_ratio = snp.likelihood_ratio()
        >>> snp.update_info()
        >>> writer.write_record(snp)
+       >>> outputVcf.close()
 
 In most cases your sample libraries will each contain a different number of 
 reads, and so you need to provide GBStools with a set of normalization factors

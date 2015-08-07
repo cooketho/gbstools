@@ -3,6 +3,7 @@ from gbstools import pyms
 import subprocess
 import sys
 import argparse
+from collections import namedtuple
 
 USAGE = """
 simulate_gbs_vcf.py --draws <number of random draws by ms>
@@ -14,6 +15,22 @@ DESCRIPTION = """
 Draw random segregating sites under a neutral coalescent model with MS (Hudson, 2002).
 Use MS results to simulate variation at restriction sites in GBS data.
 """
+
+"""INFO fields to be added to the vcf header."""
+_Info = namedtuple('Info', ['id', 'num', 'type', 'desc'])
+INFO = (_Info('DCount', None, 'Integer', 'Non-cut restriction site allele count'),
+        _Info('AC', None, 'Integer', 'Allele count in true genotypes'),
+        _Info('ACgbs', None, 'Integer', 'Allele count in genotypes after accounting for GBS allelic dropout'),
+        _Info('Hets', None, 'Integer', 'Number of true heterozygous genotypes'),
+        _Info('HetsGBS', None, 'Integer', 'Number of apparent heterozygous genotypes after accounting for GBS allelic dropout'),
+        _Info('HetsMissing', None, 'Integer', 'Number of true heterozygous genotypes that appear as missing (./.) after accounting for GBS allelic dropout'),
+        _Info('Missing', None, 'Integer', 'Number of missing (./.) genotype calls after accounting for GBS allelic dropout'),
+        _Info('Background', None, 'String', 'SNP allele(s) which co-occur on same haplotype as non-cut restriction site allele. Possible values: ancestral, derived, both'),
+        _Info('AncestralRS', None, 'String', 'Ancestral state of variable restriction site(s). Possible values: + (cut), - (non-cut), +- (multiple variable restriction site alleles with different ancestral states)'))
+
+"""FORMAT fields to be added to the vcf header."""
+_Format = namedtuple('Format', ['id', 'num', 'type', 'desc'])
+FORMAT = _Format('GT', None, 'String', 'Genotype. Alleles that are unobservable by GBS are denoted by `.` where the true value of the unobservable allele can be either 0 or 1')
 
 parser = argparse.ArgumentParser(usage=USAGE, description=DESCRIPTION)
 parser.add_argument('--draws', dest='draws', type=int, help='number of random draws by ms')
@@ -57,9 +74,12 @@ analysis = ("%s, "  % reader.command,
             "sampled_only=%r, " % args.sampled_only,
             "missing=%f" % args.missing)
 
-header = "##fileformat=VCFv4.1\n"
-header += "##analysis=" + '\t'.join(analysis) + "\n"
-header += "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t"
+outstream.write("##fileformat=VCFv4.1\n")
+outstream.write("##analysis=" + '\t'.join(analysis) + "\n")
+for info in INFO:
+    outstream.write("##INFO=<ID=%s,Number=.,Type=%s,Description=\"%s\">\n" % (info.id, info.type, info.desc))
+outstream.write("##FORMAT=<ID=%s,Number=.,Type=%s,Description=\"%s\">\n" % (FORMAT.id, FORMAT.type, FORMAT.desc))
+header = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t"
 header += '\t'.join([str(i) for i in range(n)]) + '\n'
 outstream.write(header)
 for site in reader:

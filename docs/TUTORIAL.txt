@@ -1,6 +1,54 @@
 GBStools tutorial
-2013-10-09
+2015-08-06
 Tom Cooke cooketho@gmail.com
+
+The first part of this tutorial describes how to simulate a GBS data set
+and run GBStools on it. The second part describes how to prepare input files
+for running GBStools on actual datasets.
+
+Part 1: Simulating GBS data.
+============================
+
+1) Download and install the program "ms":
+http://home.uchicago.edu/rhudson1/source/mksamples.html
+
+2) Generate simulated genetic data with ms (or use gbstools/test/sim.n100.theta0.001.ms). 
+For example, for N=100 diploid samples, we will draw 200 simulated haplotypes at 
+100 loci. We will assume the per-nucleotide population mutation rate is 0.001.
+Since we will assume each locus is 500 bp long, we will set the -t (theta) 
+parameter to 0.001 * 500 = 0.5. 
+
+    ms 200 100 -t 0.5 > sim.n100.theta0.001.ms
+
+3) Parse the ms output and convert it to simulated GBS data. We'll simulate 
+500 bp fragments flanked by 6 bp restriction sites. Allelic dropout can occur when there
+is a SNP within these flanking 6 bp sites, or if there is a variable restriction site
+somewhere in the middle of the fragment. In this example each base in the middle of the 
+fragment has probability = 0.0074 of being located in a restriction site (based on the
+empirical frequency of BsaXI, CspCI, and BpuEI restriction sites in the human genome), 
+and if the internal restriction site has a SNP in it, it is assumed to cause allelic dropout.
+The simulator is for paired-end reads, and the read length is set to 101 bp. Sites with
+more than 25% missing genotypes are excluded (--missing parameter).
+
+   simulate_gbs_vcf.py -i sim.n100.theta0.001.ms --frag_len 500 --site_len 6 --site_prob 0.0074 --read_len 101 --missing 0.25 --sampled_only > sim.n100.theta0.001.vcf
+
+4) Simulate GBS coverage. Mean coverage is set to 100X (--lambda parameter). The dispersion 
+index of the negative binomial distribution used to simulate coverage is set to 2.5 
+(--dispersion_mean), and the sequencing error rate is set to 0.001 (--epsilon).
+   
+   cat sim.n100.theta0.001.vcf | simulate_dp.py --lambda 100 --dispersion_mean 2.5 --epsilon 0.001 > sim.n100.theta0.001.dp_100.vcf
+
+5) Run GBStools
+
+   polymorphism_test.py -i sim.n100.theta0.001.dp_100.vcf -o sim.n100.theta0.001.dp_100.scored.vcf
+
+6) Extract data to tab-delimited format.
+
+   cat sim.n100.theta0.001.dp_100.scored.vcf | extract_vcf_info.py > sim.n100.theta0.001.dp_100.scored.txt
+
+
+Part 2: Preparing input files and running GBStools
+==================================================
 
 GBStools comes packaged with a toy data set (located in gbstools/test/):
 

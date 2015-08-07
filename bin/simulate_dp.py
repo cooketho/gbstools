@@ -5,6 +5,7 @@ from scipy.stats import nbinom
 import math
 import numpy
 import argparse
+from collections import namedtuple
 
 USAGE = """
 cat <myvcf> | simulate_dp.py --lambda <coverage> > <mynewvcf>
@@ -16,6 +17,16 @@ drawn from a negative binomial distribution with mean=lambda and index of
 dispersion=d. For calculating PL, the case call error rate is assumed to be
 0.001 by default.
 """
+
+"""INFO fields to be added to the vcf header."""
+_Info = namedtuple('Info', ['id', 'num', 'type', 'desc'])
+INFO = _Info('Dispersion', None, 'Float', 'Dispersion index of negative binomial random variable used for simulating GBS coverage')
+
+"""FORMAT fields to be added to the vcf header."""
+_Format = namedtuple('Format', ['id', 'num', 'type', 'desc'])
+FORMAT = (_Format('AD', None, 'Integer', 'Allelic depths for the ref and alt alleles in the order listed'),
+          _Format('DP', None, 'Integer', 'Read depth in GBS simulation'),
+          _Format('PL', None, 'Integer', 'Normalized, Phred-scaled likelihoods for genotypes as defined in the VCF specification'))
 
 parser = argparse.ArgumentParser(usage=USAGE, description=DESCRIPTION)
 parser.add_argument('-l', '--lambda', dest='lamb', type=float, help='mean depth of coverage', required=True)
@@ -55,6 +66,9 @@ for line in sys.stdin:
         print line
         continue
     elif line[:6] == '#CHROM':
+        print"##INFO=<ID=%s,Number=.,Type=%s,Description=\"%s\">" % (INFO.id, INFO.type, INFO.desc)
+        for fmat in FORMAT:
+            print"##FORMAT=<ID=%s,Number=.,Type=%s,Description=\"%s\">" % (fmat.id, fmat.type, fmat.desc)
         print '##analysis=simulate_dp.py --lambda %f --epsilon %f --dispersion_mean %f --dispersion_sd %f --seed %s' % (args.lamb, args.epsilon, args.dmean, args.dsd, str(args.seed))
         print line
         continue
