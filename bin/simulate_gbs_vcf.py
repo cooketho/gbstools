@@ -114,6 +114,7 @@ for site in reader:
                 info += "ACgbs=%i;" % site.ac_sampled[i]
                 info += "Hets=%i;" % site.hets[i]
                 info += "HetsGBS=%i;" % site.hets_sampled[i]
+                info += "HetsMissing=%i;" % site.hets_missing[i]
                 info += "Missing=%i;" % site.missing[i]
                 info += "Background=%s;" % background
                 info += "AncestralRS=%s" % ancestral_rs
