@@ -10,6 +10,7 @@ Dependencies
 pyvcf
 scipy
 pysam
+cython
 
 Installation
 ============
